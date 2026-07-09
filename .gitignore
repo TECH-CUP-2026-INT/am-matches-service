@@ -4,9 +4,6 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 
-### Datos de ejecución local ###
-storage/
-
 ### STS ###
 .apt_generated
 .classpath
