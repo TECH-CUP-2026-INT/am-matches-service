@@ -1,5 +1,8 @@
 # Servicio de Partidos (service-match) — TechCup Fútbol
 
+[![CI](https://github.com/TECH-CUP-2026-INT/am-matches-service/actions/workflows/ci.yml/badge.svg)](https://github.com/TECH-CUP-2026-INT/am-matches-service/actions/workflows/ci.yml)
+[![Docs](https://img.shields.io/badge/docs-mkdocs-6a1b9a)](https://tech-cup-2026-int.github.io/am-matches-service/)
+
 Microservicio responsable del **arbitraje en tiempo real** de los partidos del torneo
 universitario TechCup Fútbol. Es uno de ~12 microservicios independientes de la
 plataforma; su único actor es el **árbitro** y su única responsabilidad es la
@@ -210,8 +213,41 @@ por tarjetas, el marcador en vivo, las transiciones válidas/inválidas del
 cronómetro (iniciar, pausar, reanudar, finalizar), el cálculo del minuto actual,
 y la sanitización de rutas de archivo en la subida de planilla.
 
-## Diagramas
+## CI/CD
 
-Ver [`docs/DIAGRAMAS.md`](docs/DIAGRAMAS.md): componentes generales, clases del
-dominio, y secuencia de los tres flujos más representativos (iniciar partido,
-registrar tarjeta con sanción, registrar gol).
+El pipeline en [`.github/workflows/ci.yml`](.github/workflows/ci.yml) se
+dispara en cada `push` a `main`/`develop`/`feature/**` y en cada
+`pull_request` hacia `main`/`develop`, y automatiza:
+
+1. Checkout del código.
+2. Configuración del entorno (JDK 21 + cache de Maven).
+3. Compilación (`./mvnw compile`).
+4. Ejecución de pruebas (`./mvnw test`), con publicación del reporte.
+5. Análisis estático con SonarQube.
+6. Empaquetado del JAR y publicación como artefacto.
+7. Dockerización con el `Dockerfile` multi-stage del repositorio.
+8. Publicación de la imagen en GitHub Container Registry
+   (`ghcr.io/tech-cup-2026-int/am-matches-service`).
+
+Requiere los secrets `SONAR_HOST_URL` y `SONAR_TOKEN` configurados en el
+repositorio; la publicación en GHCR usa el `GITHUB_TOKEN` automático de
+Actions.
+
+## Documentación completa
+
+La documentación técnica extendida (introducción, requerimientos,
+configuración, arquitectura y diagramas, API, pruebas, equipo, anexos) está
+construida con [MkDocs](https://www.mkdocs.org/) y vive en [`docs/`](docs/),
+publicada en <https://tech-cup-2026-int.github.io/am-matches-service/>.
+
+Para servirla en local:
+
+```bash
+pip install mkdocs-material
+mkdocs serve
+```
+
+Ver [`docs/arquitectura.md`](docs/arquitectura.md) para los diagramas de
+componentes, clases del dominio, y secuencia de los tres flujos más
+representativos (iniciar partido, registrar tarjeta con sanción, registrar
+gol).

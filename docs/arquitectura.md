@@ -1,10 +1,81 @@
-# Diagramas — Servicio de Partidos
+# Arquitectura
 
-## 1. Componentes generales
+## Capas
 
-Vista de alto nivel: el árbitro nunca llega directo a este servicio (todo pasa por
-el API Gateway), y este servicio nunca llama directo a otro microservicio de
-negocio salvo a través de sus puertos de integración.
+El servicio separa la lógica de negocio de los controllers y de los detalles
+de integración externa:
+
+```
+controller/      Endpoints REST, validación de entrada, sin lógica de negocio
+service/         Casos de uso e invariantes de negocio (interfaz + implementación)
+entity/          Entidades JPA (persistencia)
+repository/      Spring Data JPA
+dto/request/     Payloads de entrada (records + Bean Validation)
+dto/response/    Payloads de salida (siempre incluyen eventType, nunca solo color)
+mapper/          entity <-> DTO
+integration/     Puertos + adapters REST hacia Competencia, Estadísticas,
+                 Notificaciones y Auditoría
+storage/         Puerto + adapter de almacenamiento de la planilla del partido
+security/        Lectura de claims del JWT y verificación del rol árbitro
+exception/       Excepciones de dominio + manejador global (@RestControllerAdvice)
+config/          Propiedades tipadas (@ConfigurationProperties) y seguridad
+```
+
+## Por qué integraciones síncronas detrás de puertos
+
+Se evaluó mensajería asíncrona (Kafka/RabbitMQ) vs. llamadas REST síncronas
+para notificar a Estadísticas, Notificaciones y Auditoría. Como la plataforma
+aún no tiene un broker desplegado, se optó por el punto intermedio:
+**interfaces de dominio** (`MatchEventPublisher`, `SanctionNotifier`,
+`AuditReporter`, `CompetenciaClient`) con una única implementación REST
+configurable por URL. Esto evita bloquear el desarrollo esperando
+infraestructura, y permite reemplazar la implementación por un publisher de
+eventos sin tocar la capa de servicio.
+
+Las llamadas hacia Estadísticas, Notificaciones y Auditoría son
+**best-effort**: un fallo ahí se registra en el log pero nunca bloquea ni
+revierte el registro del evento del árbitro (requisito de "responder
+rápido"). La llamada a Competencia (obtener partido programado + alineación)
+sí es bloqueante, porque es una precondición obligatoria para iniciar el
+partido.
+
+## Modelo de datos
+
+- **match**: estado del partido en vivo (marcador, periodo actual,
+  cronómetro, tiempo añadido, referencia al partido programado en
+  Competencia).
+- **goal**, **card**, **substitution**: eventos del partido, cada uno ligado
+  a `match`.
+- **match_observation**: observaciones de texto libre del árbitro.
+- **match_sheet**: referencia al archivo de la planilla subida (una por
+  partido).
+
+El cronómetro se calcula en el momento de la consulta a partir de
+`accumulated_seconds` + `period_started_at` — no depende de un job en segundo
+plano ni de columnas que haya que refrescar periódicamente.
+
+## Regla de sanción por tarjetas
+
+Configurable en `application.yml`
+(`techcup.sanciones.umbral-amarillas-partido`, por defecto `2`): 2 tarjetas
+amarillas de un jugador en el mismo partido, o una roja directa, disparan una
+notificación de sanción al Servicio de Notificaciones.
+
+## Accesibilidad (daltonismo)
+
+Todo evento de partido (gol, tarjeta, inicio, fin) expone un campo
+`eventType` explícito en su respuesta. Las tarjetas además exponen
+`colorHint` como sugerencia visual — nunca como única fuente de verdad.
+
+---
+
+## Diagramas
+
+### 1. Componentes generales
+
+Vista de alto nivel: el árbitro nunca llega directo a este servicio (todo
+pasa por el API Gateway), y este servicio nunca llama directo a otro
+microservicio de negocio salvo a través de sus puertos de integración.
 
 ```mermaid
 flowchart TB
@@ -40,14 +111,12 @@ flowchart TB
     Ports -->|"REST síncrono best-effort"| Auditoria
 ```
 
-**Por qué el Gateway está en el camino crítico:** este servicio decodifica los
-claims del JWT pero **no verifica su firma** — asume que solo el Gateway puede
-alcanzarlo. Por eso no debe exponerse directo a internet (ver [Seguridad](#seguridad)
-en el README).
+**Por qué el Gateway está en el camino crítico:** este servicio decodifica
+los claims del JWT pero **no verifica su firma** — asume que solo el Gateway
+puede alcanzarlo. Por eso no debe exponerse directo a internet (ver
+[Seguridad](anexos.md#hallazgos-de-seguridad) en los anexos).
 
----
-
-## 2. Clases (modelo de dominio)
+### 2. Clases (modelo de dominio)
 
 ```mermaid
 classDiagram
@@ -167,12 +236,10 @@ classDiagram
 cada `*Response` DTO expone junto al color sugerido, para que ninguna alerta
 dependa solo de color (accesibilidad daltonismo).
 
----
+### 3. Secuencia: iniciar partido
 
-## 3. Secuencia: iniciar partido
-
-Precondición bloqueante: si Competencia no confirma la alineación o el horario
-programado no ha llegado, el partido no inicia.
+Precondición bloqueante: si Competencia no confirma la alineación o el
+horario programado no ha llegado, el partido no inicia.
 
 ```mermaid
 sequenceDiagram
@@ -206,9 +273,7 @@ sequenceDiagram
     end
 ```
 
----
-
-## 4. Secuencia: registrar tarjeta (con regla de sanción)
+### 4. Secuencia: registrar tarjeta (con regla de sanción)
 
 ```mermaid
 sequenceDiagram
@@ -244,9 +309,7 @@ sequenceDiagram
     CardC-->>Arbitro: 201 Created
 ```
 
----
-
-## 5. Secuencia: registrar gol
+### 5. Secuencia: registrar gol
 
 ```mermaid
 sequenceDiagram
