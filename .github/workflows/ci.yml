@@ -34,6 +34,18 @@ jobs:
       - name: Compilar y ejecutar pruebas
         run: ./mvnw clean verify
 
+      - name: Análisis estático con SonarQube
+        if: success()
+        run: |
+          ./mvnw sonar:sonar \
+            -Dsonar.projectKey=am-matches-service \
+            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
+            -Dsonar.token=${{ secrets.SONAR_TOKEN }}
+
+      - name: Construir imagen Docker
+        if: success()
+        run: docker build -t am-matches-service:latest .
+
       - name: Subir artefacto JAR
         if: success()
         uses: actions/upload-artifact@v4
