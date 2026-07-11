@@ -6,11 +6,12 @@ on:
       - main
       - develop
       - "feature/**"
+      - sebastian
   pull_request:
     branches:
       - main
       - develop
-
+      - sebastian
 env:
   IMAGE_NAME: ${{ github.repository }}
 
