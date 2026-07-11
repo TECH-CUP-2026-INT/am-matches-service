@@ -25,6 +25,27 @@ jobs:
     permissions:
       contents: read
 
+    # --- NUEVO: contenedor de Postgres disponible durante todo el job ---
+    # GitHub levanta esto ANTES de tus steps y lo tira al terminar el job.
+    # Queda accesible en localhost:5432 desde los "steps" de abajo.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: matches_db
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+        ports:
+          - 5432:5432
+        # Espera a que Postgres esté listo para aceptar conexiones
+        # antes de dejar avanzar el job (si no, "mvnw test" podría
+        # arrancar antes de que la base esté lista y fallar igual).
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
       - name: Checkout del código
         uses: actions/checkout@v4
@@ -53,6 +74,13 @@ jobs:
         run: ./mvnw --batch-mode --no-transfer-progress compile
 
       - name: Ejecutar pruebas
+        # --- NUEVO: le decimos a Spring Boot a qué base conectarse ---
+        # Estas variables sobreescriben spring.datasource.* de tu
+        # application.properties/yml solo durante esta ejecución.
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/matches_db
+          SPRING_DATASOURCE_USERNAME: test
+          SPRING_DATASOURCE_PASSWORD: test
         run: ./mvnw --batch-mode --no-transfer-progress test
 
       - name: Publicar reporte de pruebas
