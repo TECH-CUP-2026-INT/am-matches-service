@@ -99,7 +99,8 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           ./mvnw --batch-mode --no-transfer-progress sonar:sonar \
-            -Dsonar.projectKey=am-matches-service \
+            -Dsonar.projectKey=TECH-CUP-2026-INT_am-matches-service \
+            -Dsonar.organization=tech-cup-2026-int \
             -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
             -Dsonar.token=${{ secrets.SONAR_TOKEN }}
 
