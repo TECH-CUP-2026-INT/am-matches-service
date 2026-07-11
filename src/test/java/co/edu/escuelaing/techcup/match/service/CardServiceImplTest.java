@@ -112,4 +112,14 @@ class CardServiceImplTest {
         verify(sanctionNotifier).notifyPlayerSanctioned(any());
         verify(cardRepository, never()).countByMatchIdAndPlayerIdAndCardType(any(), any(), any());
     }
+
+    @Test
+    void teamNotInMatch_throwsInvalidTeamException() {
+        UUID otherTeamId = UUID.randomUUID();
+        doThrow(new InvalidTeamException(otherTeamId, matchId))
+                .when(matchAccessService).validateTeamBelongsToMatch(eq(match), eq(otherTeamId));
+
+        assertThrows(InvalidTeamException.class, () -> cardService.registerCard(
+                matchId, refereeId, new RegisterCardRequest(otherTeamId, playerId, CardType.YELLOW, 10)));
+    }
 }
