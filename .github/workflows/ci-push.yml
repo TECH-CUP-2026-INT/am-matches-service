@@ -97,11 +97,7 @@ jobs:
           path: target/*.jar
           retention-days: 14
 
-  # ---------------------------------------------------------------------
-  # 2) Dockerización y publicación de la imagen
-  #    Solo se publica imagen desde master y qa (no desde feature/** ni
-  #    desde ramas personales como sebastian).
-  # ---------------------------------------------------------------------
+
   dockerize-publish:
     name: Build & Publish Docker Image
     needs: build-test-analyze
@@ -144,12 +140,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # ---------------------------------------------------------------------
-  # 3) Despliegue a producción
-  #    Solo corre cuando el push es a master (o sea, después del merge
-  #    del PR). Apunta el Azure App Service (Web App for Containers) a
-  #    la imagen recién publicada en GHCR.
-  # ---------------------------------------------------------------------
+
   deploy:
     name: Deploy a Azure App Service
     needs: dockerize-publish
