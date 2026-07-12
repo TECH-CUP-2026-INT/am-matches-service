@@ -1,33 +1,22 @@
-name: Matches Service - CI
+name: Matches Service - CI (Push)
 
 on:
   push:
     branches:
-      - main
-      - develop
+      - master
+      - qa
       - "feature/**"
       - sebastian
-  pull_request:
-    branches:
-      - main
-      - develop
-      - sebastian
+
 env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  # ---------------------------------------------------------------------
-  # 1) Checkout, entorno, compilación, pruebas, análisis estático, empaquetado
-  # ---------------------------------------------------------------------
   build-test-analyze:
     name: Build, Test & Analyze
     runs-on: ubuntu-latest
     permissions:
       contents: read
-
-    # --- NUEVO: contenedor de Postgres disponible durante todo el job ---
-    # GitHub levanta esto ANTES de tus steps y lo tira al terminar el job.
-    # Queda accesible en localhost:5432 desde los "steps" de abajo.
     services:
       postgres:
         image: postgres:16
@@ -37,9 +26,6 @@ jobs:
           POSTGRES_PASSWORD: test
         ports:
           - 5432:5432
-        # Espera a que Postgres esté listo para aceptar conexiones
-        # antes de dejar avanzar el job (si no, "mvnw test" podría
-        # arrancar antes de que la base esté lista y fallar igual).
         options: >-
           --health-cmd pg_isready
           --health-interval 5s
@@ -50,7 +36,6 @@ jobs:
       - name: Checkout del código
         uses: actions/checkout@v4
         with:
-          # Historial completo para que SonarQube pueda calcular "new code" y blame
           fetch-depth: 0
 
       - name: Configurar Java 21
@@ -74,9 +59,6 @@ jobs:
         run: ./mvnw --batch-mode --no-transfer-progress compile
 
       - name: Ejecutar pruebas
-        # --- NUEVO: le decimos a Spring Boot a qué base conectarse ---
-        # Estas variables sobreescriben spring.datasource.* de tu
-        # application.properties/yml solo durante esta ejecución.
         env:
           SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/matches_db
           SPRING_DATASOURCE_USERNAME: test
@@ -92,8 +74,7 @@ jobs:
           retention-days: 7
 
       - name: Análisis estático con SonarQube
-        # Los forks no tienen acceso a los secrets del repo; se omite en ese caso.
-        if: success() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        if: success()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -118,16 +99,17 @@ jobs:
 
   # ---------------------------------------------------------------------
   # 2) Dockerización y publicación de la imagen
+  #    Solo se publica imagen desde master y qa (no desde feature/** ni
+  #    desde ramas personales como sebastian).
   # ---------------------------------------------------------------------
   dockerize-publish:
     name: Build & Publish Docker Image
     needs: build-test-analyze
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'
+    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/qa'
     permissions:
       contents: read
       packages: write
-
     steps:
       - name: Checkout del código
         uses: actions/checkout@v4
@@ -161,3 +143,24 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # ---------------------------------------------------------------------
+  # 3) Despliegue a producción
+  #    Solo corre cuando el push es a master (o sea, después del merge
+  #    del PR). Apunta el Azure App Service (Web App for Containers) a
+  #    la imagen recién publicada en GHCR.
+  # ---------------------------------------------------------------------
+  deploy:
+    name: Deploy a Azure App Service
+    needs: dockerize-publish
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
+    environment: production
+
+    steps:
+      - name: Desplegar contenedor en Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          images: ghcr.io/${{ env.IMAGE_NAME }}:master

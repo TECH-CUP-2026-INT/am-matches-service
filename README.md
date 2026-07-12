@@ -215,7 +215,7 @@ y la sanitización de rutas de archivo en la subida de planilla.
 
 ## CI/CD
 
-El pipeline en [`.github/workflows/ci.yml`](.github/workflows/ci.yml) se
+El pipeline en [`.github/workflows/ci.yml`](.github/workflows/ci-push.yml) se
 dispara en cada `push` a `main`/`develop`/`feature/**` y en cada
 `pull_request` hacia `main`/`develop`, y automatiza:
 
