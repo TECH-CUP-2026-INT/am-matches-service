@@ -16,19 +16,25 @@ expuesto más allá de la red interna, considerar restringirlos (perfil `dev`
 
 El API Gateway valida la firma y expiración del JWT antes de reenviar la
 petición. Este servicio **no vuelve a verificar la firma**: decodifica los
-claims del token (`JwtClaimsFilter`) para poblar el contexto de seguridad, y
-exige el rol `arbitro` (configurable vía `techcup.security.referee-role`) con
-`@PreAuthorize("@refereeGuard.isReferee()")` en cada endpoint.
+claims del token (`JwtClaimsFilter`) para poblar el contexto de seguridad.
+La mayoría de los endpoints exigen el rol `arbitro` (configurable vía
+`techcup.security.referee-role`) con `@PreAuthorize("@refereeGuard.isReferee()")`.
+El audit log de eventos (`GET /api/partidos/eventos`) exige en cambio uno de
+los roles `ADMIN`/`ORGANIZADOR` con
+`@PreAuthorize("@adminOrOrganizadorGuard.isAdminOrOrganizador()")` — ver
+[Arquitectura](arquitectura.md#roles-y-seguridad).
 
 Como el API Gateway todavía no existe en el entorno de desarrollo, para
 probar los endpoints protegidos desde Swagger usa el botón **Authorize** con
 cualquier JWT bien formado que incluya los claims `sub` (UUID) y `roles`
-(debe incluir `ARBITRO`) — no hace falta que la firma sea válida, porque este
-servicio no la verifica (esa es responsabilidad del Gateway en producción).
+(debe incluir `ARBITRO` para los endpoints de operación del partido, o
+`ADMIN`/`ORGANIZADOR` para el audit log) — no hace falta que la firma sea
+válida, porque este servicio no la verifica (esa es responsabilidad del
+Gateway en producción).
 
 ## Endpoints
 
-Todos bajo `/api/partidos`, requieren rol árbitro:
+Todos bajo `/api/partidos`. Salvo donde se indica lo contrario, requieren rol árbitro:
 
 | Método | Ruta | Descripción |
 |---|---|---|
@@ -45,6 +51,51 @@ Todos bajo `/api/partidos`, requieren rol árbitro:
 | POST / GET | `/api/partidos/{matchId}/sustituciones` | Registrar / listar sustituciones |
 | POST / GET | `/api/partidos/{matchId}/observaciones` | Registrar / listar observaciones |
 | POST / GET | `/api/partidos/{matchId}/planilla` | Subir / consultar la planilla del partido |
+| GET | `/api/partidos/eventos` | Audit log de eventos de partido — **requiere rol `ADMIN` u `ORGANIZADOR`**, no árbitro |
+
+## Consultar el audit log de eventos
+
+`GET /api/partidos/eventos?matchId={matchId}` (el parámetro `matchId` es opcional)
+
+Audit log local, de solo lectura, que agrega en una sola línea de tiempo los
+goles, tarjetas, sustituciones, observaciones y el inicio/fin de partido ya
+persistidos en la base de datos propia de este servicio, ordenados de más
+reciente a más antiguo. Sin `matchId`, devuelve eventos de todos los
+partidos. Requiere el rol `ADMIN` u `ORGANIZADOR` — un árbitro autenticado
+recibe `403 Forbidden` en este endpoint, ya que no forma parte de su flujo de
+operación del partido.
+
+Este endpoint es independiente del reporte best-effort al Servicio de
+Auditoría externo (ver [Arquitectura](arquitectura.md)); no expone datos
+nuevos, solo agrega y ordena datos que este servicio ya persiste.
+
+Response `200 OK` (`List<MatchEventResponse>`):
+
+```json
+[
+  {
+    "tipo": "GOL",
+    "matchId": "9a8b7c6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d",
+    "entidadId": "1f2e3d4c-5b6a-4978-8a9b-0c1d2e3f4a5b",
+    "actorId": "a1c3d4e5-1234-4a5b-8c9d-0e1f2a3b4c5d",
+    "timestamp": "2026-07-12T20:12:45Z",
+    "detalle": "Gol al minuto 37 (SECOND_HALF)"
+  },
+  {
+    "tipo": "PARTIDO_INICIADO",
+    "matchId": "9a8b7c6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d",
+    "entidadId": "9a8b7c6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d",
+    "actorId": "b3b6a1f0-1111-4a2b-9c3d-000000000001",
+    "timestamp": "2026-07-12T19:30:00Z",
+    "detalle": "Partido iniciado: Local vs Visitante"
+  }
+]
+```
+
+`tipo` es uno de `PARTIDO_INICIADO`, `PARTIDO_FINALIZADO`, `GOL`, `TARJETA`,
+`SUSTITUCION`, `OBSERVACION`. `actorId` identifica al árbitro (eventos de
+ciclo de vida y observaciones) o al jugador (goles/tarjetas/sustituciones)
+cuando aplica.
 
 ## Ejemplo: registrar una tarjeta
 

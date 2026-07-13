@@ -73,8 +73,21 @@ jobs:
           path: target/surefire-reports/
           retention-days: 7
 
+      - name: Verificar cobertura de pruebas (JaCoCo >= 80%)
+        run: ./mvnw --batch-mode --no-transfer-progress jacoco:check
+
+      - name: Publicar reporte de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report
+          path: target/site/jacoco/
+          retention-days: 7
+
       - name: Análisis estático con SonarQube
-        if: success()
+        # Se omite si el secret aún no está configurado en el repo, para no
+        # romper el pipeline mientras se coordina el alta en SonarCloud.
+        if: success() && secrets.SONAR_TOKEN != ''
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -83,7 +96,8 @@ jobs:
             -Dsonar.projectKey=TECH-CUP-2026-INT_am-matches-service \
             -Dsonar.organization=tech-cup-2026-int \
             -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
-            -Dsonar.token=${{ secrets.SONAR_TOKEN }}
+            -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
+            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
 
       - name: Empaquetar (jar)
         if: success()
@@ -145,7 +159,9 @@ jobs:
     name: Deploy a Azure App Service
     needs: dockerize-publish
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master'
+    # Se omite si el secret de publish-profile aún no está configurado, para
+    # no romper el pipeline mientras se coordina el alta del App Service.
+    if: github.ref == 'refs/heads/master' && secrets.AZURE_WEBAPP_PUBLISH_PROFILE != ''
     environment: production
 
     steps:

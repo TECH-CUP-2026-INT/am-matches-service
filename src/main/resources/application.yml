@@ -38,6 +38,11 @@ techcup:
   security:
     role-claim: roles
     referee-role: ARBITRO
+    internal:
+      # Debe coincidir con techcup.security.internal.api-key del servicio de
+      # notificaciones (INTERNAL_API_KEY), para autenticar las llamadas
+      # servicio-a-servicio vía InternalApiKeyFilter.
+      api-key: ${INTERNAL_API_KEY:local-dev-internal-key}
 
   sanciones:
     umbral-amarillas-partido: 2

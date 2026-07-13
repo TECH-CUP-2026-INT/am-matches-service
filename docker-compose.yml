@@ -15,5 +15,26 @@ services:
       timeout: 5s
       retries: 10
 
+  service-match:
+    build: .
+    container_name: techcup-matches-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: techcup_matches
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      SERVER_PORT: 8080
+      INTERNAL_API_KEY: local-dev-internal-key
+      # URLs de otros servicios propios del equipo astromerge; Competencia,
+      # Estadisticas y Auditoria son placeholders de otros equipos (aun no
+      # existen en este workspace).
+      NOTIFICACIONES_SERVICE_URL: http://service-notifications:8083
+    ports:
+      - "8080:8080"
+
 volumes:
   techcup-matches-data:
