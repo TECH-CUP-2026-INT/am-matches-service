@@ -6,10 +6,10 @@ import co.edu.escuelaing.techcup.match.entity.Match;
 import co.edu.escuelaing.techcup.match.entity.MatchObservation;
 import co.edu.escuelaing.techcup.match.mapper.MatchObservationMapper;
 import co.edu.escuelaing.techcup.match.repository.MatchObservationRepository;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Las observaciones libres del árbitro no están en la lista de eventos que deben
@@ -29,22 +29,21 @@ public class MatchObservationServiceImpl implements MatchObservationService {
     }
 
     @Override
-    @Transactional
     public MatchObservationResponse registerObservation(UUID matchId, UUID refereeId, RegisterObservationRequest request) {
         Match match = matchAccessService.requireOwnedMatch(matchId, refereeId);
 
         MatchObservation observation = new MatchObservation();
-        observation.setMatch(match);
+        observation.setMatchId(match.getId());
         observation.setRefereeId(refereeId);
         observation.setText(request.text());
         observation.setMinute(request.minute());
+        observation.setCreatedAt(Instant.now());
         observation = observationRepository.save(observation);
 
         return MatchObservationMapper.toResponse(observation);
     }
 
     @Override
-    @Transactional(readOnly = true)
     public List<MatchObservationResponse> listObservations(UUID matchId, UUID refereeId) {
         matchAccessService.requireOwnedMatch(matchId, refereeId);
         return observationRepository.findByMatchIdOrderByCreatedAtAsc(matchId).stream()

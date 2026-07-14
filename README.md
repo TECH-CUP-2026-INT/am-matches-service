@@ -35,8 +35,7 @@ ejecución en vivo del partido.
 | Lenguaje / runtime | Java 21 |
 | Framework | Spring Boot 3.5.6 |
 | Build | Maven |
-| Persistencia | PostgreSQL + Spring Data JPA |
-| Migraciones | Flyway |
+| Persistencia | MongoDB + Spring Data MongoDB |
 | API | Spring Web (REST) |
 | Seguridad | Spring Security (verificación de rol; el JWT ya viene validado por el API Gateway) |
 | Integraciones externas | REST síncrono vía `RestClient`, detrás de interfaces (puertos) |
@@ -49,8 +48,8 @@ detalles de integración externa:
 ```
 controller/      Endpoints REST, validación de entrada, sin lógica de negocio
 service/         Casos de uso e invariantes de negocio (interfaz + implementación)
-entity/          Entidades JPA (persistencia)
-repository/      Spring Data JPA
+entity/          Documentos de MongoDB (persistencia)
+repository/      Spring Data MongoDB
 dto/request/     Payloads de entrada (records + Bean Validation)
 dto/response/    Payloads de salida (siempre incluyen eventType, nunca solo color)
 mapper/          entity <-> DTO
@@ -80,12 +79,18 @@ precondición obligatoria para iniciar el partido.
 
 ## Modelo de datos
 
+Cada entidad es una colección independiente de MongoDB; la relación con el
+partido se modela como un campo plano `matchId` (UUID) indexado, en vez de una
+referencia de objeto (`@DBRef`), para mantener las lecturas simples y evitar
+cargas perezosas entre colecciones.
+
 - **match**: estado del partido en vivo (marcador, periodo actual, cronómetro,
   tiempo añadido, referencia al partido programado en Competencia).
-- **goal**, **card**, **substitution**: eventos del partido, cada uno ligado a
-  `match`.
+- **goal**, **card**, **substitution**: eventos del partido, cada uno con un
+  `matchId` indexado hacia `match`.
 - **match_observation**: observaciones de texto libre del árbitro.
-- **match_sheet**: referencia al archivo de la planilla subida (una por partido).
+- **match_sheet**: referencia al archivo de la planilla subida (una por
+  partido; `matchId` con índice único).
 
 El cronómetro se calcula en el momento de la consulta a partir de
 `accumulated_seconds` + `period_started_at` — no depende de un job en segundo
@@ -170,7 +175,7 @@ Variables de entorno (con valor por defecto entre paréntesis):
 
 | Variable | Uso |
 |---|---|
-| `DB_HOST` (`localhost`), `DB_PORT` (`5432`), `DB_NAME` (`techcup_matches`), `DB_USER` (`postgres`), `DB_PASSWORD` (`postgres`) | Conexión a PostgreSQL |
+| `MONGODB_URI` (`mongodb://localhost:27017/techcup_matches`) | Cadena de conexión a MongoDB |
 | `SERVER_PORT` (`8080`) | Puerto HTTP |
 | `COMPETENCIA_SERVICE_URL` (`http://localhost:8081`) | Base URL del Servicio de Competencia |
 | `ESTADISTICAS_SERVICE_URL` (`http://localhost:8082`) | Base URL del Servicio de Estadísticas |
@@ -181,10 +186,10 @@ Variables de entorno (con valor por defecto entre paréntesis):
 ## Cómo ejecutar localmente
 
 ```bash
-# 1. Levantar PostgreSQL
+# 1. Levantar MongoDB
 docker compose up -d
 
-# 2. Ejecutar el servicio (Flyway crea el esquema automáticamente)
+# 2. Ejecutar el servicio (los índices se crean automáticamente al arrancar)
 ./mvnw spring-boot:run
 ```
 
@@ -204,7 +209,8 @@ responsabilidad del Gateway en producción).
 # Pruebas unitarias de la lógica de negocio (no requieren base de datos)
 ./mvnw test -Dtest=CardServiceImplTest,GoalServiceImplTest,MatchServiceImplTest,MatchClockTest
 
-# Suite completa, incluyendo el test de contexto de Spring (requiere Postgres corriendo)
+# Suite completa, incluyendo el test de contexto de Spring (requiere MongoDB
+# corriendo, y Docker disponible para los tests de repositorio con Testcontainers)
 ./mvnw test
 ```
 

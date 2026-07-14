@@ -13,7 +13,7 @@ public final class CardMapper {
     public static CardResponse toResponse(Card card, boolean playerSanctioned) {
         return new CardResponse(
                 card.getId(),
-                card.getMatch().getId(),
+                card.getMatchId(),
                 card.getTeamId(),
                 card.getPlayerId(),
                 card.getCardType(),

@@ -77,7 +77,6 @@ se dispara en cada `push` a `main`, `develop` y `feature/**`, y en cada
   usado para el sitio.
 - [Spring Boot](https://spring.io/projects/spring-boot) — framework del
   servicio.
-- [Flyway](https://flywaydb.org/) — herramienta de migraciones de esquema.
 - [springdoc-openapi](https://springdoc.org/) — generación de la
   especificación OpenAPI y Swagger UI.
 

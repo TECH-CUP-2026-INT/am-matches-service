@@ -63,7 +63,7 @@ class MatchObservationServiceImplTest {
         when(matchAccessService.requireOwnedMatch(matchId, refereeId)).thenReturn(match);
         MatchObservation observation = new MatchObservation();
         observation.setId(UUID.randomUUID());
-        observation.setMatch(match);
+        observation.setMatchId(match.getId());
         observation.setRefereeId(refereeId);
         observation.setText("Lluvia leve en el segundo tiempo");
         observation.setCreatedAt(Instant.now());

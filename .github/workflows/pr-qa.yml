@@ -3,7 +3,7 @@ name: Matches Service - CI (PR to qa)
 on:
   pull_request:
     branches:
-      - qa
+      - develop
 
 jobs:
   build-test-analyze:
@@ -12,7 +12,7 @@ jobs:
     permissions:
       contents: read
     services:
-      mongodb:
+      mongo:
         image: mongo:7
         ports:
           - 27017:27017
@@ -50,7 +50,7 @@ jobs:
 
       - name: Ejecutar pruebas
         env:
-          SPRING_DATA_MONGODB_URI: mongodb://localhost:27017/matches_db
+          SPRING_DATA_MONGODB_URI: mongodb://localhost:27017/matches_db_test
         run: ./mvnw --batch-mode --no-transfer-progress test
 
       - name: Publicar reporte de pruebas
@@ -61,18 +61,36 @@ jobs:
           path: target/surefire-reports/
           retention-days: 7
 
-      - name: Análisis estático con SonarQube
+      - name: Verificar cobertura de pruebas (JaCoCo >= 80%)
+        run: ./mvnw --batch-mode --no-transfer-progress jacoco:check
 
+      - name: Publicar reporte de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report
+          path: target/site/jacoco/
+          retention-days: 7
+
+      - name: Análisis estático con SonarQube
+        # El contexto "secrets" no puede usarse en una condición "if:" (no es
+        # un contexto disponible ahí); por eso el chequeo de "¿está
+        # configurado el token?" se hace dentro del script, no en el "if:".
         if: success() && github.event.pull_request.head.repo.full_name == github.repository
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
+          if [ -z "$SONAR_TOKEN" ]; then
+            echo "SONAR_TOKEN no configurado en el repo; se omite el análisis SonarQube."
+            exit 0
+          fi
           ./mvnw --batch-mode --no-transfer-progress sonar:sonar \
             -Dsonar.projectKey=TECH-CUP-2026-INT_am-matches-service \
             -Dsonar.organization=tech-cup-2026-int \
             -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
-            -Dsonar.token=${{ secrets.SONAR_TOKEN }}
+            -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
+            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
 
       - name: Empaquetar (jar)
         if: success()

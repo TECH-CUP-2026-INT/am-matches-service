@@ -3,8 +3,9 @@ name: Matches Service - CI (Push)
 on:
   push:
     branches:
-      - master
-      - qa
+      - main
+      - develop
+      - feature
       - "feature/**"
       - sebastian
 
@@ -18,7 +19,7 @@ jobs:
     permissions:
       contents: read
     services:
-      mongodb:
+      mongo:
         image: mongo:7
         ports:
           - 27017:27017
@@ -56,7 +57,7 @@ jobs:
 
       - name: Ejecutar pruebas
         env:
-          SPRING_DATA_MONGODB_URI: mongodb://localhost:27017/matches_db
+          SPRING_DATA_MONGODB_URI: mongodb://localhost:27017/matches_db_test
         run: ./mvnw --batch-mode --no-transfer-progress test
 
       - name: Publicar reporte de pruebas
@@ -67,17 +68,36 @@ jobs:
           path: target/surefire-reports/
           retention-days: 7
 
+      - name: Verificar cobertura de pruebas (JaCoCo >= 80%)
+        run: ./mvnw --batch-mode --no-transfer-progress jacoco:check
+
+      - name: Publicar reporte de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report
+          path: target/site/jacoco/
+          retention-days: 7
+
       - name: Análisis estático con SonarQube
+        # El contexto "secrets" no puede usarse en una condición "if:" (no es
+        # un contexto disponible ahí); por eso el chequeo de "¿está
+        # configurado el token?" se hace dentro del script, no en el "if:".
         if: success()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
+          if [ -z "$SONAR_TOKEN" ]; then
+            echo "SONAR_TOKEN no configurado en el repo; se omite el análisis SonarQube."
+            exit 0
+          fi
           ./mvnw --batch-mode --no-transfer-progress sonar:sonar \
             -Dsonar.projectKey=TECH-CUP-2026-INT_am-matches-service \
             -Dsonar.organization=tech-cup-2026-int \
             -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
-            -Dsonar.token=${{ secrets.SONAR_TOKEN }}
+            -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
+            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
 
       - name: Empaquetar (jar)
         if: success()
@@ -96,12 +116,20 @@ jobs:
     name: Build & Publish Docker Image
     needs: build-test-analyze
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/qa'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
     permissions:
       contents: read
       packages: write
-
+    outputs:
+      azure_secret_present: ${{ steps.check-azure-secret.outputs.present }}
     steps:
+      - name: Comprobar si el secret de Azure está configurado
+        # "secrets" no es un contexto válido dentro de un "if:", así que el
+        # chequeo se hace en un step normal y se expone como output del job
+        # para que el job "deploy" lo lea vía "needs.*.outputs".
+        id: check-azure-secret
+        run: echo "present=${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE != '' }}" >> "$GITHUB_OUTPUT"
+
       - name: Checkout del código
         uses: actions/checkout@v4
 
@@ -135,11 +163,14 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+
   deploy:
     name: Deploy a Azure App Service
     needs: dockerize-publish
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master'
+    # Se omite si el secret de publish-profile aún no está configurado, para
+    # no romper el pipeline mientras se coordina el alta del App Service.
+    if: github.ref == 'refs/heads/main' && needs.dockerize-publish.outputs.azure_secret_present == 'true'
     environment: production
 
     steps:
@@ -148,4 +179,4 @@ jobs:
         with:
           app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          images: ghcr.io/${{ env.IMAGE_NAME }}:master
+          images: ghcr.io/${{ env.IMAGE_NAME }}:main

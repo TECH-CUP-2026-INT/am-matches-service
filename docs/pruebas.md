@@ -6,7 +6,8 @@
 # Pruebas unitarias de la lógica de negocio (no requieren base de datos)
 ./mvnw test -Dtest=CardServiceImplTest,GoalServiceImplTest,MatchServiceImplTest,MatchClockTest
 
-# Suite completa, incluyendo el test de contexto de Spring (requiere Postgres corriendo)
+# Suite completa, incluyendo el test de contexto de Spring (requiere MongoDB
+# corriendo, y Docker disponible para los tests de repositorio con Testcontainers)
 ./mvnw test
 ```
 
@@ -27,7 +28,7 @@ docker compose up -d
 | `SubstitutionServiceImplTest` | Registro de sustituciones |
 | `MatchObservationServiceImplTest` | Registro de observaciones de texto libre |
 | `MatchSheetServiceImplTest` | Sanitización de rutas de archivo en la subida de la planilla (path traversal) |
-| `ServiceMatchApplicationTests` | Carga del contexto de Spring Boot (requiere PostgreSQL) |
+| `ServiceMatchApplicationTests` | Carga del contexto de Spring Boot (requiere MongoDB) |
 
 ## Pruebas en el pipeline de CI
 

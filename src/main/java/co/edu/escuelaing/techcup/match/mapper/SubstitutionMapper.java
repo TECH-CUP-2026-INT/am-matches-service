@@ -12,7 +12,7 @@ public final class SubstitutionMapper {
     public static SubstitutionResponse toResponse(Substitution substitution) {
         return new SubstitutionResponse(
                 substitution.getId(),
-                substitution.getMatch().getId(),
+                substitution.getMatchId(),
                 substitution.getTeamId(),
                 substitution.getPlayerOutId(),
                 substitution.getPlayerInId(),

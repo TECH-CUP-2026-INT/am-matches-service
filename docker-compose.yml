@@ -1,19 +1,33 @@
 services:
-  postgres:
-    image: postgres:16
+  mongo:
+    image: mongo:7
     container_name: techcup-matches-db
-    environment:
-      POSTGRES_DB: techcup_matches
-      POSTGRES_PASSWORD: postgres
     ports:
-      - "5432:5432"
+      - "27017:27017"
     volumes:
-      - techcup-matches-data:/var/lib/postgresql/data
+      - techcup-matches-mongodata:/data/db
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "mongosh --eval \"db.adminCommand('ping')\""]
       interval: 5s
       timeout: 5s
       retries: 10
 
+  service-match:
+    build: .
+    container_name: techcup-matches-app
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/techcup_matches
+      SERVER_PORT: 8080
+      INTERNAL_API_KEY: local-dev-internal-key
+      # URLs de otros servicios propios del equipo astromerge; Competencia,
+      # Estadisticas y Auditoria son placeholders de otros equipos (aun no
+      # existen en este workspace).
+      NOTIFICACIONES_SERVICE_URL: http://service-notifications:8083
+    ports:
+      - "8080:8080"
+
 volumes:
-  techcup-matches-data:
+  techcup-matches-mongodata:

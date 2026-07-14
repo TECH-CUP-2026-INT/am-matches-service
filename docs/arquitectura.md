@@ -8,18 +8,46 @@ de integración externa:
 ```
 controller/      Endpoints REST, validación de entrada, sin lógica de negocio
 service/         Casos de uso e invariantes de negocio (interfaz + implementación)
-entity/          Entidades JPA (persistencia)
-repository/      Spring Data JPA
+entity/          Documentos de MongoDB (persistencia)
+repository/      Spring Data MongoDB
 dto/request/     Payloads de entrada (records + Bean Validation)
 dto/response/    Payloads de salida (siempre incluyen eventType, nunca solo color)
 mapper/          entity <-> DTO
 integration/     Puertos + adapters REST hacia Competencia, Estadísticas,
                  Notificaciones y Auditoría
 storage/         Puerto + adapter de almacenamiento de la planilla del partido
-security/        Lectura de claims del JWT y verificación del rol árbitro
+security/        Lectura de claims del JWT y verificación de roles (árbitro, admin/organizador)
 exception/       Excepciones de dominio + manejador global (@RestControllerAdvice)
 config/          Propiedades tipadas (@ConfigurationProperties) y seguridad
 ```
+
+## Roles y seguridad
+
+El servicio no autentica usuarios ni verifica firmas de JWT (eso es
+responsabilidad del API Gateway, ver [Autenticación](api.md#autenticación));
+solo decodifica los claims (`JwtClaimsFilter`) para poblar el contexto de
+seguridad de Spring, y expone dos guards de `@PreAuthorize` (Spring Method
+Security, `@EnableMethodSecurity` en `SecurityConfig`) que consultan las
+autoridades `ROLE_<rol>` ya derivadas del claim `roles` del JWT:
+
+- **`RefereeGuard`** (`@refereeGuard.isReferee()`): exige el rol árbitro
+  (configurable vía `techcup.security.referee-role`, por defecto `ARBITRO`).
+  Protege todos los endpoints de operación del partido (iniciar, registrar
+  goles/tarjetas/sustituciones/observaciones, subir planilla, etc.) — un
+  árbitro solo puede operar sus propios partidos asignados
+  (`MatchAccessService`).
+- **`AdminOrOrganizadorGuard`** (`@adminOrOrganizadorGuard.isAdminOrOrganizador()`):
+  exige el rol `ADMIN` u `ORGANIZADOR` (hardcodeados, sin propiedad de
+  configuración dedicada porque el nombre del claim ya es genérico). Protege
+  únicamente el audit log local de solo lectura
+  (`GET /api/partidos/eventos`, `MatchEventController`) — un rol
+  completamente distinto del árbitro, que solo consulta lo que ya ocurrió y
+  no puede operar partidos.
+
+Como `JwtClaimsFilter` ya decodifica el claim `roles` de forma genérica (sin
+acoplarse a un valor fijo), agregar el segundo guard no requirió tocar el
+filtro ni `SecurityConfig` — solo un nuevo bean de guard y su uso en
+`@PreAuthorize` del nuevo controller.
 
 ## Por qué integraciones síncronas detrás de puertos
 
@@ -67,6 +95,20 @@ Todo evento de partido (gol, tarjeta, inicio, fin) expone un campo
 `eventType` explícito en su respuesta. Las tarjetas además exponen
 `colorHint` como sugerencia visual — nunca como única fuente de verdad.
 
+## Verificación de conectividad con notification-service
+
+Se levantaron `am-matches-service`, `am-notification-service` y
+`am-logistic-service` a la vez con sus respectivos `docker compose up
+--build` (puertos `8080`/`8083`/`8085`, Postgres en `5432`/`5433`/`5434`,
+sin colisiones) y se ejercitó el flujo real: 2 tarjetas amarillas al mismo
+jugador en el mismo partido → `CardServiceImpl` dispara la sanción →
+`RestSanctionNotifier` llama a `POST /api/notificaciones/sanciones` con el
+header `X-Internal-Api-Key` → se consultó `GET /api/notificaciones` en
+notification-service autenticado como ese jugador y la notificación de
+sanción apareció en su historial. Confirma que el fix del header aplicado
+en esta auditoría (ver [Anexos](anexos.md)) funciona end-to-end, no solo en
+tests unitarios.
+
 ---
 
 ## Diagramas
@@ -87,7 +129,7 @@ flowchart TB
         Controller["Controllers REST<br/>(match / goal / card / substitution / observation / sheet)"]
         Security["JwtClaimsFilter + RefereeGuard<br/>(decodifica claims, exige rol ARBITRO)"]
         Service["Capa de Servicio<br/>(reglas de negocio: cronómetro, marcador, sanciones)"]
-        Repo["Repositorios JPA"]
+        Repo["Repositorios MongoDB"]
         Ports["Puertos de integración<br/>(interfaces)"]
 
         Controller --> Security
@@ -96,7 +138,7 @@ flowchart TB
         Service --> Ports
     end
 
-    DB[("PostgreSQL<br/>techcup_matches")]
+    DB[("MongoDB<br/>techcup_matches")]
     Competencia["Servicio de Competencia"]
     Estadisticas["Servicio de Estadísticas"]
     Notificaciones["Servicio de Notificaciones"]
@@ -249,7 +291,7 @@ sequenceDiagram
     participant MS as MatchService
     participant CC as CompetenciaClient
     participant Comp as Servicio de Competencia
-    participant DB as PostgreSQL
+    participant DB as MongoDB
     participant Aud as AuditReporter
 
     Arbitro->>GW: POST /partidos/{competenciaMatchId}/iniciar (JWT)
@@ -280,7 +322,7 @@ sequenceDiagram
     actor Arbitro as Árbitro
     participant CardC as CardController
     participant CardS as CardService
-    participant DB as PostgreSQL
+    participant DB as MongoDB
     participant Est as Servicio de Estadísticas
     participant Aud as Servicio de Auditoría
     participant Not as Servicio de Notificaciones
@@ -316,7 +358,7 @@ sequenceDiagram
     actor Arbitro as Árbitro
     participant GoalC as GoalController
     participant GoalS as GoalService
-    participant DB as PostgreSQL
+    participant DB as MongoDB
     participant Est as Servicio de Estadísticas
     participant Aud as Servicio de Auditoría
 
