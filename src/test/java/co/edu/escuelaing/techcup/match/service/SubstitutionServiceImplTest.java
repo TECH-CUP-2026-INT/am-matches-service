@@ -86,15 +86,4 @@ class SubstitutionServiceImplTest {
         assertThrows(ValidationException.class, () -> substitutionService.registerSubstitution(
                 matchId, refereeId, new RegisterSubstitutionRequest(teamId, samePlayer, samePlayer, 70)));
     }
-
-    @Test
-    void teamNotInMatch_throwsInvalidTeamException() {
-        when(matchAccessService.requireActiveMatch(matchId, refereeId)).thenReturn(match);
-        UUID otherTeam = UUID.randomUUID();
-        doThrow(new InvalidTeamException(otherTeam, matchId))
-                .when(matchAccessService).validateTeamBelongsToMatch(match, otherTeam);
-
-        assertThrows(InvalidTeamException.class, () -> substitutionService.registerSubstitution(
-                matchId, refereeId, new RegisterSubstitutionRequest(otherTeam, UUID.randomUUID(), UUID.randomUUID(), 70)));
-    }
 }

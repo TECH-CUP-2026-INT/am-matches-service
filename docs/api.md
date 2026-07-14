@@ -1,0 +1,145 @@
+# API
+
+## Documentación interactiva (Swagger UI)
+
+Con el servicio corriendo:
+[http://localhost:8080/swagger-ui/index.html](http://localhost:8080/swagger-ui/index.html)
+
+La especificación OpenAPI cruda está disponible en `/v3/api-docs`.
+
+`/swagger-ui/**` y `/v3/api-docs/**` están abiertos sin autenticación para
+facilitar la exploración durante el desarrollo. Antes de un despliegue
+expuesto más allá de la red interna, considerar restringirlos (perfil `dev`
+únicamente).
+
+## Autenticación
+
+El API Gateway valida la firma y expiración del JWT antes de reenviar la
+petición. Este servicio **no vuelve a verificar la firma**: decodifica los
+claims del token (`JwtClaimsFilter`) para poblar el contexto de seguridad.
+La mayoría de los endpoints exigen el rol `arbitro` (configurable vía
+`techcup.security.referee-role`) con `@PreAuthorize("@refereeGuard.isReferee()")`.
+El audit log de eventos (`GET /api/partidos/eventos`) exige en cambio uno de
+los roles `ADMIN`/`ORGANIZADOR` con
+`@PreAuthorize("@adminOrOrganizadorGuard.isAdminOrOrganizador()")` — ver
+[Arquitectura](arquitectura.md#roles-y-seguridad).
+
+Como el API Gateway todavía no existe en el entorno de desarrollo, para
+probar los endpoints protegidos desde Swagger usa el botón **Authorize** con
+cualquier JWT bien formado que incluya los claims `sub` (UUID) y `roles`
+(debe incluir `ARBITRO` para los endpoints de operación del partido, o
+`ADMIN`/`ORGANIZADOR` para el audit log) — no hace falta que la firma sea
+válida, porque este servicio no la verifica (esa es responsabilidad del
+Gateway en producción).
+
+## Endpoints
+
+Todos bajo `/api/partidos`. Salvo donde se indica lo contrario, requieren rol árbitro:
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/api/partidos` | Partidos asignados al árbitro autenticado |
+| GET | `/api/partidos/{matchId}` | Estado detallado de un partido |
+| POST | `/api/partidos/{competenciaMatchId}/iniciar` | Inicia el partido (valida con Competencia) |
+| POST | `/api/partidos/{matchId}/pausar` | Pausa el cronómetro |
+| POST | `/api/partidos/{matchId}/reanudar` | Reanuda el cronómetro |
+| POST | `/api/partidos/{matchId}/siguiente-tiempo` | Pasa de primer a segundo tiempo |
+| POST | `/api/partidos/{matchId}/tiempo-adicional` | Agrega minutos de tiempo añadido |
+| POST | `/api/partidos/{matchId}/finalizar` | Finaliza el partido |
+| POST / GET | `/api/partidos/{matchId}/goles` | Registrar / listar goles |
+| POST / GET | `/api/partidos/{matchId}/tarjetas` | Registrar / listar tarjetas |
+| POST / GET | `/api/partidos/{matchId}/sustituciones` | Registrar / listar sustituciones |
+| POST / GET | `/api/partidos/{matchId}/observaciones` | Registrar / listar observaciones |
+| POST / GET | `/api/partidos/{matchId}/planilla` | Subir / consultar la planilla del partido |
+| GET | `/api/partidos/eventos` | Audit log de eventos de partido — **requiere rol `ADMIN` u `ORGANIZADOR`**, no árbitro |
+
+## Consultar el audit log de eventos
+
+`GET /api/partidos/eventos?matchId={matchId}` (el parámetro `matchId` es opcional)
+
+Audit log local, de solo lectura, que agrega en una sola línea de tiempo los
+goles, tarjetas, sustituciones, observaciones y el inicio/fin de partido ya
+persistidos en la base de datos propia de este servicio, ordenados de más
+reciente a más antiguo. Sin `matchId`, devuelve eventos de todos los
+partidos. Requiere el rol `ADMIN` u `ORGANIZADOR` — un árbitro autenticado
+recibe `403 Forbidden` en este endpoint, ya que no forma parte de su flujo de
+operación del partido.
+
+Este endpoint es independiente del reporte best-effort al Servicio de
+Auditoría externo (ver [Arquitectura](arquitectura.md)); no expone datos
+nuevos, solo agrega y ordena datos que este servicio ya persiste.
+
+Response `200 OK` (`List<MatchEventResponse>`):
+
+```json
+[
+  {
+    "tipo": "GOL",
+    "matchId": "9a8b7c6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d",
+    "entidadId": "1f2e3d4c-5b6a-4978-8a9b-0c1d2e3f4a5b",
+    "actorId": "a1c3d4e5-1234-4a5b-8c9d-0e1f2a3b4c5d",
+    "timestamp": "2026-07-12T20:12:45Z",
+    "detalle": "Gol al minuto 37 (SECOND_HALF)"
+  },
+  {
+    "tipo": "PARTIDO_INICIADO",
+    "matchId": "9a8b7c6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d",
+    "entidadId": "9a8b7c6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d",
+    "actorId": "b3b6a1f0-1111-4a2b-9c3d-000000000001",
+    "timestamp": "2026-07-12T19:30:00Z",
+    "detalle": "Partido iniciado: Local vs Visitante"
+  }
+]
+```
+
+`tipo` es uno de `PARTIDO_INICIADO`, `PARTIDO_FINALIZADO`, `GOL`, `TARJETA`,
+`SUSTITUCION`, `OBSERVACION`. `actorId` identifica al árbitro (eventos de
+ciclo de vida y observaciones) o al jugador (goles/tarjetas/sustituciones)
+cuando aplica.
+
+## Ejemplo: registrar una tarjeta
+
+`POST /api/partidos/{matchId}/tarjetas`
+
+Request (`RegisterCardRequest`):
+
+```json
+{
+  "teamId": "b2f1e2b0-7c1a-4e9a-9b1a-2f0e1c8d5a11",
+  "playerId": "a1c3d4e5-1234-4a5b-8c9d-0e1f2a3b4c5d",
+  "cardType": "YELLOW",
+  "minute": 37
+}
+```
+
+Response `201 Created` (`CardResponse`):
+
+```json
+{
+  "id": "1f2e3d4c-5b6a-4978-8a9b-0c1d2e3f4a5b",
+  "matchId": "9a8b7c6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d",
+  "teamId": "b2f1e2b0-7c1a-4e9a-9b1a-2f0e1c8d5a11",
+  "playerId": "a1c3d4e5-1234-4a5b-8c9d-0e1f2a3b4c5d",
+  "cardType": "YELLOW",
+  "colorHint": "#FBC02D",
+  "minute": 37,
+  "period": "SECOND_HALF",
+  "eventType": "YELLOW_CARD",
+  "playerSanctioned": true,
+  "createdAt": "2026-07-09T20:12:45Z"
+}
+```
+
+`colorHint` es solo una sugerencia visual para la UI; `eventType` (y
+`cardType`) es la fuente de verdad — ninguna alerta debe depender únicamente
+del color (accesibilidad daltonismo, ver [Anexos](anexos.md)).
+`playerSanctioned` indica si esta tarjeta disparó una sanción (roja directa o
+umbral de amarillas alcanzado, ver [Arquitectura](arquitectura.md#regla-de-sancion-por-tarjetas)).
+
+## Errores
+
+Los errores de negocio (partido no encontrado, transición de estado
+inválida, partido no listo para iniciar, etc.) se manejan de forma
+centralizada en `GlobalExceptionHandler` (`@RestControllerAdvice`) y se
+devuelven con el DTO `ErrorResponse`, incluyendo un código HTTP acorde
+(`404`, `409`, `400`, etc.).

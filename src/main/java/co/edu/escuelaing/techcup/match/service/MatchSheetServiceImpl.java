@@ -9,10 +9,10 @@ import co.edu.escuelaing.techcup.match.mapper.MatchSheetMapper;
 import co.edu.escuelaing.techcup.match.repository.MatchSheetRepository;
 import co.edu.escuelaing.techcup.match.storage.FileStorage;
 import jakarta.validation.ValidationException;
+import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class MatchSheetServiceImpl implements MatchSheetService {
@@ -33,7 +33,6 @@ public class MatchSheetServiceImpl implements MatchSheetService {
     }
 
     @Override
-    @Transactional
     public MatchSheetResponse uploadSheet(UUID matchId, UUID refereeId, MatchSheetUploadCommand command) {
         Match match = matchAccessService.requireOwnedMatch(matchId, refereeId);
 
@@ -48,16 +47,16 @@ public class MatchSheetServiceImpl implements MatchSheetService {
         String fileUrl = fileStorage.store(matchId, command.fileName(), command.contentType(), command.content());
 
         MatchSheet sheet = new MatchSheet();
-        sheet.setMatch(match);
+        sheet.setMatchId(match.getId());
         sheet.setFileUrl(fileUrl);
         sheet.setUploadedBy(refereeId);
+        sheet.setUploadedAt(Instant.now());
         sheet = matchSheetRepository.save(sheet);
 
         return MatchSheetMapper.toResponse(sheet);
     }
 
     @Override
-    @Transactional(readOnly = true)
     public MatchSheetResponse getSheet(UUID matchId, UUID refereeId) {
         matchAccessService.requireOwnedMatch(matchId, refereeId);
         return matchSheetRepository.findByMatchId(matchId)

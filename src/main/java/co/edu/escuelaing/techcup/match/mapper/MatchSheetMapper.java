@@ -11,7 +11,7 @@ public final class MatchSheetMapper {
     public static MatchSheetResponse toResponse(MatchSheet sheet) {
         return new MatchSheetResponse(
                 sheet.getId(),
-                sheet.getMatch().getId(),
+                sheet.getMatchId(),
                 sheet.getFileUrl(),
                 sheet.getUploadedBy(),
                 sheet.getUploadedAt()

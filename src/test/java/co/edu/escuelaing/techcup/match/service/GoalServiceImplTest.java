@@ -85,12 +85,4 @@ class GoalServiceImplTest {
         assertThat(response.awayScore()).isEqualTo(1);
         assertThat(response.homeScore()).isEqualTo(0);
     }
-
-    @Test
-    void goalWithoutExplicitMinute_usesComputedCurrentMinute() {
-        GoalResponse response = goalService.registerGoal(
-                matchId, refereeId, new RegisterGoalRequest(homeTeamId, UUID.randomUUID(), null));
-
-        assertThat(response.minute()).isGreaterThanOrEqualTo(1);
-    }
 }

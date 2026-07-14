@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class CardServiceImpl implements CardService {
@@ -49,7 +48,6 @@ public class CardServiceImpl implements CardService {
     }
 
     @Override
-    @Transactional
     public CardResponse registerCard(UUID matchId, UUID refereeId, RegisterCardRequest request) {
         Match match = matchAccessService.requireActiveMatch(matchId, refereeId);
         matchAccessService.validateTeamBelongsToMatch(match, request.teamId());
@@ -57,12 +55,13 @@ public class CardServiceImpl implements CardService {
         int minute = request.minute() != null ? request.minute() : MatchClock.currentMinute(match);
 
         Card card = new Card();
-        card.setMatch(match);
+        card.setMatchId(match.getId());
         card.setTeamId(request.teamId());
         card.setPlayerId(request.playerId());
         card.setCardType(request.cardType());
         card.setMinute(minute);
         card.setPeriod(match.getCurrentPeriod());
+        card.setCreatedAt(Instant.now());
         card = cardRepository.save(card);
 
         eventPublisher.publishCard(new CardEventPayload(
@@ -81,7 +80,6 @@ public class CardServiceImpl implements CardService {
     }
 
     @Override
-    @Transactional(readOnly = true)
     public List<CardResponse> listCards(UUID matchId, UUID refereeId) {
         matchAccessService.requireOwnedMatch(matchId, refereeId);
         List<Card> cards = cardRepository.findByMatchIdOrderByMinuteAsc(matchId);

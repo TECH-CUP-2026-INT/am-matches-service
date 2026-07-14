@@ -19,9 +19,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class MatchServiceImpl implements MatchService {
@@ -42,7 +42,6 @@ public class MatchServiceImpl implements MatchService {
     }
 
     @Override
-    @Transactional(readOnly = true)
     public List<MatchSummaryResponse> listAssignedMatches(UUID refereeId) {
         List<ScheduledMatchInfo> assigned = competenciaClient.getAssignedMatches(refereeId);
         return assigned.stream()
@@ -53,14 +52,12 @@ public class MatchServiceImpl implements MatchService {
     }
 
     @Override
-    @Transactional(readOnly = true)
     public MatchResponse getMatch(UUID matchId, UUID refereeId) {
         Match match = matchAccessService.requireOwnedMatch(matchId, refereeId);
         return MatchMapper.toResponse(match, MatchClock.currentMinute(match), null);
     }
 
     @Override
-    @Transactional
     public MatchResponse startMatch(UUID competenciaMatchId, UUID refereeId) {
         ScheduledMatchInfo scheduled = competenciaClient.getScheduledMatch(competenciaMatchId);
 
@@ -71,9 +68,16 @@ public class MatchServiceImpl implements MatchService {
             throw new MatchNotReadyException("El partido aún no ha llegado a su hora programada de inicio");
         }
 
-        Match match = matchRepository.findByCompetenciaMatchId(competenciaMatchId).orElseGet(Match::new);
+        // Nota: con Mongo el id de Match se genera en el constructor (inicializador de
+        // campo), por lo que ya no sirve "match.getId() != null" para distinguir un
+        // partido existente de uno nuevo (siempre tendría id). Se usa el Optional
+        // devuelto por el repositorio para esa decisión.
+        Optional<Match> existingMatch = matchRepository.findByCompetenciaMatchId(competenciaMatchId);
+        Match match;
+        Instant now = Instant.now();
 
-        if (match.getId() != null) {
+        if (existingMatch.isPresent()) {
+            match = existingMatch.get();
             if (!match.getRefereeId().equals(refereeId)) {
                 throw new MatchAccessDeniedException(competenciaMatchId);
             }
@@ -81,20 +85,22 @@ public class MatchServiceImpl implements MatchService {
                 throw new InvalidMatchStateException("El partido ya fue iniciado o finalizado previamente");
             }
         } else {
+            match = new Match();
             match.setCompetenciaMatchId(scheduled.competenciaMatchId());
             match.setHomeTeamId(scheduled.homeTeamId());
             match.setAwayTeamId(scheduled.awayTeamId());
             match.setHomeTeamName(scheduled.homeTeamName());
             match.setAwayTeamName(scheduled.awayTeamName());
             match.setRefereeId(refereeId);
+            match.setCreatedAt(now);
         }
 
-        Instant now = Instant.now();
         match.setStatus(MatchStatus.IN_PROGRESS);
         match.setCurrentPeriod(MatchPeriod.FIRST_HALF);
         match.setStartedAt(now);
         match.setPeriodStartedAt(now);
         match.setAccumulatedSeconds(0);
+        match.setUpdatedAt(now);
 
         match = matchRepository.save(match);
 
@@ -104,7 +110,6 @@ public class MatchServiceImpl implements MatchService {
     }
 
     @Override
-    @Transactional
     public MatchResponse pauseMatch(UUID matchId, UUID refereeId) {
         Match match = matchAccessService.requireOwnedMatch(matchId, refereeId);
         if (match.getStatus() != MatchStatus.IN_PROGRESS) {
@@ -116,13 +121,13 @@ public class MatchServiceImpl implements MatchService {
                 + Duration.between(match.getPeriodStartedAt(), now).getSeconds());
         match.setStatus(MatchStatus.PAUSED);
         match.setPeriodStartedAt(null);
+        match.setUpdatedAt(now);
         match = matchRepository.save(match);
 
         return MatchMapper.toResponse(match, MatchClock.currentMinute(match), EventType.MATCH_PAUSED);
     }
 
     @Override
-    @Transactional
     public MatchResponse resumeMatch(UUID matchId, UUID refereeId) {
         Match match = matchAccessService.requireOwnedMatch(matchId, refereeId);
         if (match.getStatus() != MatchStatus.PAUSED) {
@@ -131,13 +136,13 @@ public class MatchServiceImpl implements MatchService {
 
         match.setStatus(MatchStatus.IN_PROGRESS);
         match.setPeriodStartedAt(Instant.now());
+        match.setUpdatedAt(Instant.now());
         match = matchRepository.save(match);
 
         return MatchMapper.toResponse(match, MatchClock.currentMinute(match), EventType.MATCH_RESUMED);
     }
 
     @Override
-    @Transactional
     public MatchResponse startNextPeriod(UUID matchId, UUID refereeId) {
         Match match = matchAccessService.requireOwnedMatch(matchId, refereeId);
         if (match.getStatus() != MatchStatus.PAUSED) {
@@ -150,13 +155,13 @@ public class MatchServiceImpl implements MatchService {
         match.setCurrentPeriod(MatchPeriod.SECOND_HALF);
         match.setStatus(MatchStatus.IN_PROGRESS);
         match.setPeriodStartedAt(Instant.now());
+        match.setUpdatedAt(Instant.now());
         match = matchRepository.save(match);
 
         return MatchMapper.toResponse(match, MatchClock.currentMinute(match), EventType.MATCH_RESUMED);
     }
 
     @Override
-    @Transactional
     public MatchResponse addInjuryTime(UUID matchId, UUID refereeId, int minutes) {
         Match match = matchAccessService.requireActiveMatch(matchId, refereeId);
 
@@ -165,13 +170,13 @@ public class MatchServiceImpl implements MatchService {
         } else {
             match.setAddedMinutesFirstHalf(match.getAddedMinutesFirstHalf() + minutes);
         }
+        match.setUpdatedAt(Instant.now());
         match = matchRepository.save(match);
 
         return MatchMapper.toResponse(match, MatchClock.currentMinute(match), null);
     }
 
     @Override
-    @Transactional
     public MatchResponse finishMatch(UUID matchId, UUID refereeId) {
         Match match = matchAccessService.requireOwnedMatch(matchId, refereeId);
         if (match.getStatus() == MatchStatus.FINISHED) {
@@ -189,6 +194,7 @@ public class MatchServiceImpl implements MatchService {
         match.setStatus(MatchStatus.FINISHED);
         match.setEndedAt(now);
         match.setPeriodStartedAt(null);
+        match.setUpdatedAt(now);
         match = matchRepository.save(match);
 
         auditReporter.report(new MatchAuditEvent(match.getId(), EventType.MATCH_FINISHED, refereeId, now, Map.of()));

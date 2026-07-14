@@ -8,23 +8,10 @@ spring:
     exclude:
       - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
 
-  datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:techcup_matches}
-    username: ${DB_USER:postgres}
-    password: ${DB_PASSWORD:postgres}
-
-  jpa:
-    open-in-view: false
-    hibernate:
-      ddl-auto: validate
-    properties:
-      hibernate:
-        format_sql: true
-
-  flyway:
-    enabled: true
-    locations: classpath:db/migration
-    baseline-on-migrate: true
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/techcup_matches}
+      auto-index-creation: true
 
   servlet:
     multipart:
@@ -38,6 +25,11 @@ techcup:
   security:
     role-claim: roles
     referee-role: ARBITRO
+    internal:
+      # Debe coincidir con techcup.security.internal.api-key del servicio de
+      # notificaciones (INTERNAL_API_KEY), para autenticar las llamadas
+      # servicio-a-servicio vía InternalApiKeyFilter.
+      api-key: ${INTERNAL_API_KEY:local-dev-internal-key}
 
   sanciones:
     umbral-amarillas-partido: 2

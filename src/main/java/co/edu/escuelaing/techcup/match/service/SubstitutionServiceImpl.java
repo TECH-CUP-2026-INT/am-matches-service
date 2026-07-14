@@ -17,7 +17,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class SubstitutionServiceImpl implements SubstitutionService {
@@ -38,7 +37,6 @@ public class SubstitutionServiceImpl implements SubstitutionService {
     }
 
     @Override
-    @Transactional
     public SubstitutionResponse registerSubstitution(UUID matchId, UUID refereeId, RegisterSubstitutionRequest request) {
         Match match = matchAccessService.requireActiveMatch(matchId, refereeId);
         matchAccessService.validateTeamBelongsToMatch(match, request.teamId());
@@ -50,12 +48,13 @@ public class SubstitutionServiceImpl implements SubstitutionService {
         int minute = request.minute() != null ? request.minute() : MatchClock.currentMinute(match);
 
         Substitution substitution = new Substitution();
-        substitution.setMatch(match);
+        substitution.setMatchId(match.getId());
         substitution.setTeamId(request.teamId());
         substitution.setPlayerOutId(request.playerOutId());
         substitution.setPlayerInId(request.playerInId());
         substitution.setMinute(minute);
         substitution.setPeriod(match.getCurrentPeriod());
+        substitution.setCreatedAt(Instant.now());
         substitution = substitutionRepository.save(substitution);
 
         eventPublisher.publishSubstitution(new SubstitutionEventPayload(
@@ -72,7 +71,6 @@ public class SubstitutionServiceImpl implements SubstitutionService {
     }
 
     @Override
-    @Transactional(readOnly = true)
     public List<SubstitutionResponse> listSubstitutions(UUID matchId, UUID refereeId) {
         matchAccessService.requireOwnedMatch(matchId, refereeId);
         return substitutionRepository.findByMatchIdOrderByMinuteAsc(matchId).stream()

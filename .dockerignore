@@ -1,0 +1,11 @@
+target/
+storage/
+.idea/
+.git/
+.gitignore
+.gitattributes
+docs/
+site/
+mkdocs.yml
+*.md
+.vscode/

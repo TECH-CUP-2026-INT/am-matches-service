@@ -5,7 +5,7 @@ target/
 !**/src/test/**/target/
 
 ### Datos de ejecución local ###
-storage/
+/storage/
 
 ### STS ###
 .apt_generated

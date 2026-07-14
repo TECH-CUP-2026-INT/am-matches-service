@@ -1,0 +1,99 @@
+name: Matches Service - CI (PR to main)
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-test-analyze:
+    name: Build, Test & Analyze
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.adminCommand(\"ping\")'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configurar Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Cachear paquetes de SonarQube
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      - name: Dar permisos al Maven Wrapper
+        run: chmod +x mvnw
+
+      - name: Compilar
+        run: ./mvnw --batch-mode --no-transfer-progress compile
+
+      - name: Ejecutar pruebas
+        env:
+          SPRING_DATA_MONGODB_URI: mongodb://localhost:27017/matches_db_test
+        run: ./mvnw --batch-mode --no-transfer-progress test
+
+      - name: Publicar reporte de pruebas
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: target/surefire-reports/
+          retention-days: 7
+
+      - name: Verificar cobertura de pruebas (JaCoCo)
+        run: ./mvnw --batch-mode --no-transfer-progress jacoco:check
+        continue-on-error: true
+
+      - name: Publicar reporte de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report
+          path: target/site/jacoco/
+          retention-days: 7
+
+      - name: Análisis estático con SonarQube
+        if: success() && github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          ./mvnw --batch-mode --no-transfer-progress sonar:sonar \
+            -Dsonar.projectKey=TECH-CUP-2026-INT_am-matches-service \
+            -Dsonar.organization=tech-cup-2026-int \
+            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
+            -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
+            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+
+      - name: Empaquetar (jar)
+        if: success()
+        run: ./mvnw --batch-mode --no-transfer-progress package -DskipTests
+
+      - name: Publicar artefacto JAR
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: matches-service-jar
+          path: target/*.jar
+          retention-days: 14
