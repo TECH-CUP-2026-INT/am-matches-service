@@ -73,7 +73,7 @@ class MatchEventQueryServiceImplTest {
     void listEvents_withMatchIdFilter_mergesAndSortsDescendingByTimestamp() {
         Goal goal = new Goal();
         goal.setId(UUID.randomUUID());
-        goal.setMatch(match);
+        goal.setMatchId(match.getId());
         goal.setPlayerId(playerId);
         goal.setMinute(10);
         goal.setPeriod(MatchPeriod.FIRST_HALF);
@@ -81,7 +81,7 @@ class MatchEventQueryServiceImplTest {
 
         Card card = new Card();
         card.setId(UUID.randomUUID());
-        card.setMatch(match);
+        card.setMatchId(match.getId());
         card.setPlayerId(playerId);
         card.setCardType(CardType.YELLOW);
         card.setMinute(20);
@@ -90,7 +90,7 @@ class MatchEventQueryServiceImplTest {
 
         Substitution substitution = new Substitution();
         substitution.setId(UUID.randomUUID());
-        substitution.setMatch(match);
+        substitution.setMatchId(match.getId());
         substitution.setPlayerInId(UUID.randomUUID());
         substitution.setPlayerOutId(UUID.randomUUID());
         substitution.setMinute(60);
@@ -99,7 +99,7 @@ class MatchEventQueryServiceImplTest {
 
         MatchObservation observation = new MatchObservation();
         observation.setId(UUID.randomUUID());
-        observation.setMatch(match);
+        observation.setMatchId(match.getId());
         observation.setRefereeId(refereeId);
         observation.setText("Todo en orden");
         observation.setCreatedAt(now.minus(20, ChronoUnit.MINUTES));

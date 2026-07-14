@@ -3,7 +3,7 @@ name: Matches Service - CI (PR to qa)
 on:
   pull_request:
     branches:
-      - qa
+      - develop
 
 jobs:
   build-test-analyze:
@@ -12,16 +12,12 @@ jobs:
     permissions:
       contents: read
     services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_DB: matches_db
-          POSTGRES_USER: test
-          POSTGRES_PASSWORD: test
+      mongo:
+        image: mongo:7
         ports:
-          - 5432:5432
+          - 27017:27017
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "mongosh --eval 'db.adminCommand(\"ping\")'"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
@@ -54,9 +50,7 @@ jobs:
 
       - name: Ejecutar pruebas
         env:
-          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/matches_db
-          SPRING_DATASOURCE_USERNAME: test
-          SPRING_DATASOURCE_PASSWORD: test
+          SPRING_DATA_MONGODB_URI: mongodb://localhost:27017/matches_db_test
         run: ./mvnw --batch-mode --no-transfer-progress test
 
       - name: Publicar reporte de pruebas

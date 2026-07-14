@@ -17,7 +17,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class MatchEventQueryServiceImpl implements MatchEventQueryService {
@@ -41,7 +40,6 @@ public class MatchEventQueryServiceImpl implements MatchEventQueryService {
     }
 
     @Override
-    @Transactional(readOnly = true)
     public List<MatchEventResponse> listEvents(UUID matchId) {
         List<Match> matches = matchId != null
                 ? matchRepository.findById(matchId).map(List::of).orElseGet(List::of)
@@ -89,7 +87,7 @@ public class MatchEventQueryServiceImpl implements MatchEventQueryService {
         for (Goal goal : goals) {
             events.add(new MatchEventResponse(
                     MatchEventType.GOL,
-                    goal.getMatch().getId(),
+                    goal.getMatchId(),
                     goal.getId(),
                     goal.getPlayerId(),
                     goal.getCreatedAt(),
@@ -99,7 +97,7 @@ public class MatchEventQueryServiceImpl implements MatchEventQueryService {
         for (Card card : cards) {
             events.add(new MatchEventResponse(
                     MatchEventType.TARJETA,
-                    card.getMatch().getId(),
+                    card.getMatchId(),
                     card.getId(),
                     card.getPlayerId(),
                     card.getCreatedAt(),
@@ -109,7 +107,7 @@ public class MatchEventQueryServiceImpl implements MatchEventQueryService {
         for (Substitution substitution : substitutions) {
             events.add(new MatchEventResponse(
                     MatchEventType.SUSTITUCION,
-                    substitution.getMatch().getId(),
+                    substitution.getMatchId(),
                     substitution.getId(),
                     substitution.getPlayerInId(),
                     substitution.getCreatedAt(),
@@ -120,7 +118,7 @@ public class MatchEventQueryServiceImpl implements MatchEventQueryService {
         for (MatchObservation observation : observations) {
             events.add(new MatchEventResponse(
                     MatchEventType.OBSERVACION,
-                    observation.getMatch().getId(),
+                    observation.getMatchId(),
                     observation.getId(),
                     observation.getRefereeId(),
                     observation.getCreatedAt(),

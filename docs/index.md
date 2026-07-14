@@ -28,8 +28,7 @@ su única responsabilidad es la ejecución en vivo del partido.
 | Lenguaje / runtime | Java 21 |
 | Framework | Spring Boot 3.5.6 |
 | Build | Maven |
-| Persistencia | PostgreSQL + Spring Data JPA |
-| Migraciones | Flyway |
+| Persistencia | MongoDB + Spring Data MongoDB |
 | API | Spring Web (REST) + springdoc-openapi |
 | Seguridad | Spring Security (verificación de rol; el JWT ya viene validado por el API Gateway) |
 | CI/CD | GitHub Actions (build, test, análisis estático, empaquetado, Docker) |
@@ -38,10 +37,10 @@ su única responsabilidad es la ejecución en vivo del partido.
 ## Inicio rápido
 
 ```bash
-# 1. Levantar PostgreSQL
+# 1. Levantar MongoDB
 docker compose up -d
 
-# 2. Ejecutar el servicio (Flyway crea el esquema automáticamente)
+# 2. Ejecutar el servicio (los índices se crean automáticamente al arrancar)
 ./mvnw spring-boot:run
 ```
 

@@ -8,23 +8,10 @@ spring:
     exclude:
       - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
 
-  datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:techcup_matches}
-    username: ${DB_USER:postgres}
-    password: ${DB_PASSWORD:postgres}
-
-  jpa:
-    open-in-view: false
-    hibernate:
-      ddl-auto: validate
-    properties:
-      hibernate:
-        format_sql: true
-
-  flyway:
-    enabled: true
-    locations: classpath:db/migration
-    baseline-on-migrate: true
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/techcup_matches}
+      auto-index-creation: true
 
   servlet:
     multipart:

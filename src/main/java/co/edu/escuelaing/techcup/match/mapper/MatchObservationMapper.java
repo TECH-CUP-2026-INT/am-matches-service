@@ -12,7 +12,7 @@ public final class MatchObservationMapper {
     public static MatchObservationResponse toResponse(MatchObservation observation) {
         return new MatchObservationResponse(
                 observation.getId(),
-                observation.getMatch().getId(),
+                observation.getMatchId(),
                 observation.getRefereeId(),
                 observation.getText(),
                 observation.getMinute(),

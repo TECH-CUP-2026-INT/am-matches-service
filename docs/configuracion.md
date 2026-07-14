@@ -10,10 +10,10 @@ cd am-matches-service
 ## Ejecutar el servicio localmente
 
 ```bash
-# 1. Levantar PostgreSQL (definido en docker-compose.yml)
+# 1. Levantar MongoDB (definido en docker-compose.yml)
 docker compose up -d
 
-# 2. Ejecutar el servicio (Flyway crea el esquema automáticamente)
+# 2. Ejecutar el servicio (los índices se crean automáticamente al arrancar)
 ./mvnw spring-boot:run
 ```
 
@@ -27,7 +27,7 @@ en JRE 21 sobre Alpine):
 ```bash
 docker build -t am-matches-service:latest .
 docker run --rm -p 8080:8080 \
-  -e DB_HOST=host.docker.internal \
+  -e MONGODB_URI=mongodb://host.docker.internal:27017/techcup_matches \
   am-matches-service:latest
 ```
 
@@ -35,11 +35,7 @@ docker run --rm -p 8080:8080 \
 
 | Variable | Valor por defecto | Uso |
 |---|---|---|
-| `DB_HOST` | `localhost` | Host de PostgreSQL |
-| `DB_PORT` | `5432` | Puerto de PostgreSQL |
-| `DB_NAME` | `techcup_matches` | Nombre de la base de datos |
-| `DB_USER` | `postgres` | Usuario de la base de datos |
-| `DB_PASSWORD` | `postgres` | Contraseña de la base de datos |
+| `MONGODB_URI` | `mongodb://localhost:27017/techcup_matches` | Cadena de conexión a MongoDB |
 | `SERVER_PORT` | `8080` | Puerto HTTP del servicio |
 | `COMPETENCIA_SERVICE_URL` | `http://localhost:8081` | Base URL del Servicio de Competencia |
 | `ESTADISTICAS_SERVICE_URL` | `http://localhost:8082` | Base URL del Servicio de Estadísticas |

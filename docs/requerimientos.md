@@ -71,7 +71,7 @@ Para desarrollar y ejecutar el servicio localmente:
 | Herramienta | Versión mínima | Uso |
 |---|---|---|
 | [Java (JDK)](https://adoptium.net/) | 21 | Compilación y ejecución del servicio |
-| [Docker](https://www.docker.com/) / Docker Compose | 24+ | Base de datos PostgreSQL y contenedor de la aplicación |
+| [Docker](https://www.docker.com/) / Docker Compose | 24+ | Base de datos MongoDB y contenedor de la aplicación |
 | [Git](https://git-scm.com/) | 2.x | Control de versiones |
 | Maven Wrapper (`mvnw`, incluido en el repo) | — | No requiere instalación de Maven local |
 

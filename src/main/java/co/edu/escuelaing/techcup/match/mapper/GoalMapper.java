@@ -12,7 +12,7 @@ public final class GoalMapper {
     public static GoalResponse toResponse(Goal goal, int homeScore, int awayScore) {
         return new GoalResponse(
                 goal.getId(),
-                goal.getMatch().getId(),
+                goal.getMatchId(),
                 goal.getTeamId(),
                 goal.getPlayerId(),
                 goal.getMinute(),

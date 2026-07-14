@@ -18,7 +18,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class GoalServiceImpl implements GoalService {
@@ -42,7 +41,6 @@ public class GoalServiceImpl implements GoalService {
     }
 
     @Override
-    @Transactional
     public GoalResponse registerGoal(UUID matchId, UUID refereeId, RegisterGoalRequest request) {
         Match match = matchAccessService.requireActiveMatch(matchId, refereeId);
         matchAccessService.validateTeamBelongsToMatch(match, request.teamId());
@@ -50,11 +48,12 @@ public class GoalServiceImpl implements GoalService {
         int minute = request.minute() != null ? request.minute() : MatchClock.currentMinute(match);
 
         Goal goal = new Goal();
-        goal.setMatch(match);
+        goal.setMatchId(match.getId());
         goal.setTeamId(request.teamId());
         goal.setPlayerId(request.playerId());
         goal.setMinute(minute);
         goal.setPeriod(match.getCurrentPeriod());
+        goal.setCreatedAt(Instant.now());
         goal = goalRepository.save(goal);
 
         if (request.teamId().equals(match.getHomeTeamId())) {
@@ -62,6 +61,7 @@ public class GoalServiceImpl implements GoalService {
         } else {
             match.setAwayScore(match.getAwayScore() + 1);
         }
+        match.setUpdatedAt(Instant.now());
         matchRepository.save(match);
 
         eventPublisher.publishGoal(new GoalEventPayload(
@@ -74,7 +74,6 @@ public class GoalServiceImpl implements GoalService {
     }
 
     @Override
-    @Transactional(readOnly = true)
     public List<GoalResponse> listGoals(UUID matchId, UUID refereeId) {
         Match match = matchAccessService.requireOwnedMatch(matchId, refereeId);
         List<Goal> goals = goalRepository.findByMatchIdOrderByMinuteAsc(matchId);

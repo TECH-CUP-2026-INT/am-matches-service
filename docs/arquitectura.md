@@ -8,8 +8,8 @@ de integración externa:
 ```
 controller/      Endpoints REST, validación de entrada, sin lógica de negocio
 service/         Casos de uso e invariantes de negocio (interfaz + implementación)
-entity/          Entidades JPA (persistencia)
-repository/      Spring Data JPA
+entity/          Documentos de MongoDB (persistencia)
+repository/      Spring Data MongoDB
 dto/request/     Payloads de entrada (records + Bean Validation)
 dto/response/    Payloads de salida (siempre incluyen eventType, nunca solo color)
 mapper/          entity <-> DTO
@@ -129,7 +129,7 @@ flowchart TB
         Controller["Controllers REST<br/>(match / goal / card / substitution / observation / sheet)"]
         Security["JwtClaimsFilter + RefereeGuard<br/>(decodifica claims, exige rol ARBITRO)"]
         Service["Capa de Servicio<br/>(reglas de negocio: cronómetro, marcador, sanciones)"]
-        Repo["Repositorios JPA"]
+        Repo["Repositorios MongoDB"]
         Ports["Puertos de integración<br/>(interfaces)"]
 
         Controller --> Security
@@ -138,7 +138,7 @@ flowchart TB
         Service --> Ports
     end
 
-    DB[("PostgreSQL<br/>techcup_matches")]
+    DB[("MongoDB<br/>techcup_matches")]
     Competencia["Servicio de Competencia"]
     Estadisticas["Servicio de Estadísticas"]
     Notificaciones["Servicio de Notificaciones"]
@@ -291,7 +291,7 @@ sequenceDiagram
     participant MS as MatchService
     participant CC as CompetenciaClient
     participant Comp as Servicio de Competencia
-    participant DB as PostgreSQL
+    participant DB as MongoDB
     participant Aud as AuditReporter
 
     Arbitro->>GW: POST /partidos/{competenciaMatchId}/iniciar (JWT)
@@ -322,7 +322,7 @@ sequenceDiagram
     actor Arbitro as Árbitro
     participant CardC as CardController
     participant CardS as CardService
-    participant DB as PostgreSQL
+    participant DB as MongoDB
     participant Est as Servicio de Estadísticas
     participant Aud as Servicio de Auditoría
     participant Not as Servicio de Notificaciones
@@ -358,7 +358,7 @@ sequenceDiagram
     actor Arbitro as Árbitro
     participant GoalC as GoalController
     participant GoalS as GoalService
-    participant DB as PostgreSQL
+    participant DB as MongoDB
     participant Est as Servicio de Estadísticas
     participant Aud as Servicio de Auditoría
 

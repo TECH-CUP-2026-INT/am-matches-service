@@ -10,13 +10,19 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
-import org.springframework.test.context.ActiveProfiles;
+import org.springframework.boot.test.autoconfigure.data.mongo.DataMongoTest;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.testcontainers.containers.MongoDBContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
-@DataJpaTest
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@Testcontainers
+@DataMongoTest
 class GoalRepositoryTest {
+
+    @Container
+    @ServiceConnection
+    static MongoDBContainer mongoContainer = new MongoDBContainer("mongo:7");
 
     @Autowired
     private GoalRepository goalRepository;
@@ -39,7 +45,7 @@ class GoalRepositoryTest {
 
     private Goal buildGoal(Match match, int minute) {
         Goal goal = new Goal();
-        goal.setMatch(match);
+        goal.setMatchId(match.getId());
         goal.setTeamId(match.getHomeTeamId());
         goal.setPlayerId(UUID.randomUUID());
         goal.setMinute(minute);
