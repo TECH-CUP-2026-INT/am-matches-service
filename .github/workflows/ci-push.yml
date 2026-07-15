@@ -9,7 +9,6 @@ on:
       - develop
       - "feature/**"
       - "fix/**"
-      - sebastian
 
 env:
   IMAGE_NAME: ${{ github.repository }}
