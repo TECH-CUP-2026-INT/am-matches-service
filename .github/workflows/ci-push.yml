@@ -7,7 +7,6 @@ on:
       - develop
       - feature
       - "feature/**"
-      - sebastian
 
 env:
   IMAGE_NAME: ${{ github.repository }}
