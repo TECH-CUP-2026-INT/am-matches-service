@@ -73,7 +73,7 @@ class MatchFinishedStatPublisherTest {
         assertThat(event.teamId()).isEqualTo(match.getHomeTeamId());
         assertThat(event.goals()).isEqualTo(2);
         assertThat(event.yellowCards()).isEqualTo(1);
-        assertThat(event.redCards()).isEqualTo(0);
+        assertThat(event.redCards()).isZero();
         assertThat(event.result()).isEqualTo(MatchResult.WON);
         assertThat(event.tournamentId()).isEqualTo(tournamentId);
         assertThat(event.foulsCommitted()).isZero();

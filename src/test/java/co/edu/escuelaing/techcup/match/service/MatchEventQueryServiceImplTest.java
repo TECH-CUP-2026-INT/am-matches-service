@@ -113,8 +113,9 @@ class MatchEventQueryServiceImplTest {
         List<MatchEventResponse> events = service.listEvents(matchId);
 
         // 2 lifecycle events (started/ended) + goal + card + substitution + observation = 6
-        assertThat(events).hasSize(6);
-        assertThat(events).isSortedAccordingTo((a, b) -> b.timestamp().compareTo(a.timestamp()));
+        assertThat(events)
+                .hasSize(6)
+                .isSortedAccordingTo((a, b) -> b.timestamp().compareTo(a.timestamp()));
         assertThat(events.get(0).tipo()).isEqualTo(MatchEventType.PARTIDO_FINALIZADO);
         assertThat(events).extracting(MatchEventResponse::tipo)
                 .contains(MatchEventType.PARTIDO_INICIADO, MatchEventType.PARTIDO_FINALIZADO,

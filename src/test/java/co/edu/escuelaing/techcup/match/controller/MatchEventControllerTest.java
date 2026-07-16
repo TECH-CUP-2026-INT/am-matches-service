@@ -1,6 +1,5 @@
 package co.edu.escuelaing.techcup.match.controller;
 
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -23,9 +22,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(controllers = MatchEventController.class)
@@ -40,7 +39,7 @@ class MatchEventControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private MatchEventQueryService matchEventQueryService;
 
     private String buildToken(String rolesJson) {
@@ -93,7 +92,7 @@ class MatchEventControllerTest {
     void listEvents_withMatchIdFilter_passesItToService() throws Exception {
         UUID matchId = UUID.randomUUID();
         String token = buildToken("[\"ADMIN\"]");
-        when(matchEventQueryService.listEvents(eq(matchId))).thenReturn(List.of());
+        when(matchEventQueryService.listEvents(matchId)).thenReturn(List.of());
 
         mockMvc.perform(get("/api/partidos/eventos")
                         .header("Authorization", "Bearer " + token)

@@ -71,8 +71,9 @@ class MatchSheetServiceImplTest {
         when(matchAccessService.requireOwnedMatch(matchId, refereeId)).thenReturn(match);
         when(matchSheetRepository.findByMatchId(matchId)).thenReturn(Optional.of(new MatchSheet()));
 
-        assertThrows(MatchSheetAlreadyExistsException.class, () -> matchSheetService.uploadSheet(
-                matchId, refereeId, new MatchSheetUploadCommand("acta.pdf", "application/pdf", new byte[]{1})));
+        MatchSheetUploadCommand command = new MatchSheetUploadCommand("acta.pdf", "application/pdf", new byte[]{1});
+        assertThrows(MatchSheetAlreadyExistsException.class,
+                () -> matchSheetService.uploadSheet(matchId, refereeId, command));
     }
 
     @Test
@@ -80,8 +81,9 @@ class MatchSheetServiceImplTest {
         when(matchAccessService.requireOwnedMatch(matchId, refereeId)).thenReturn(match);
         when(matchSheetRepository.findByMatchId(matchId)).thenReturn(Optional.empty());
 
-        assertThrows(ValidationException.class, () -> matchSheetService.uploadSheet(matchId, refereeId,
-                new MatchSheetUploadCommand("acta.exe", "application/x-msdownload", new byte[]{1})));
+        MatchSheetUploadCommand command =
+                new MatchSheetUploadCommand("acta.exe", "application/x-msdownload", new byte[]{1});
+        assertThrows(ValidationException.class, () -> matchSheetService.uploadSheet(matchId, refereeId, command));
     }
 
     @Test

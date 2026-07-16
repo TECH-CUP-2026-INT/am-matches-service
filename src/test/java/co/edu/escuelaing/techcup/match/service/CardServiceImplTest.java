@@ -3,7 +3,6 @@ package co.edu.escuelaing.techcup.match.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -117,9 +116,9 @@ class CardServiceImplTest {
     void teamNotInMatch_throwsInvalidTeamException() {
         UUID otherTeamId = UUID.randomUUID();
         doThrow(new InvalidTeamException(otherTeamId, matchId))
-                .when(matchAccessService).validateTeamBelongsToMatch(eq(match), eq(otherTeamId));
+                .when(matchAccessService).validateTeamBelongsToMatch(match, otherTeamId);
 
-        assertThrows(InvalidTeamException.class, () -> cardService.registerCard(
-                matchId, refereeId, new RegisterCardRequest(otherTeamId, playerId, CardType.YELLOW, 10)));
+        RegisterCardRequest request = new RegisterCardRequest(otherTeamId, playerId, CardType.YELLOW, 10);
+        assertThrows(InvalidTeamException.class, () -> cardService.registerCard(matchId, refereeId, request));
     }
 }

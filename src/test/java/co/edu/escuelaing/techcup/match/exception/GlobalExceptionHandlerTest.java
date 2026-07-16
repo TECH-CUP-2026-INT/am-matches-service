@@ -1,6 +1,7 @@
 package co.edu.escuelaing.techcup.match.exception;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import co.edu.escuelaing.techcup.match.dto.response.ErrorResponse;
@@ -89,8 +90,8 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void handleValidation_joinsFieldErrors() {
-        MethodArgumentNotValidException ex = org.mockito.Mockito.mock(MethodArgumentNotValidException.class);
-        BindingResult bindingResult = org.mockito.Mockito.mock(BindingResult.class);
+        MethodArgumentNotValidException ex = mock(MethodArgumentNotValidException.class);
+        BindingResult bindingResult = mock(BindingResult.class);
         FieldError fieldError = new FieldError("request", "minute", "no puede ser negativo");
         when(ex.getBindingResult()).thenReturn(bindingResult);
         when(bindingResult.getFieldErrors()).thenReturn(List.of(fieldError));

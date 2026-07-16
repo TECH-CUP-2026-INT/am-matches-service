@@ -1,7 +1,7 @@
 package co.edu.escuelaing.techcup.match.integration.auditoria;
 
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -59,14 +59,15 @@ class RestAuditReporterTest {
 
         reporter.report(new MatchAuditEvent(UUID.randomUUID(), EventType.GOAL, UUID.randomUUID(), Instant.now(), Map.of()));
 
-        verify(bodyUriSpec).uri(eq("/api/auditoria/eventos"));
+        verify(bodyUriSpec).uri("/api/auditoria/eventos");
     }
 
     @Test
     void report_restClientException_isSwallowed() {
         when(bodySpec.retrieve()).thenThrow(new RestClientException("down"));
 
-        reporter.report(new MatchAuditEvent(UUID.randomUUID(), EventType.MATCH_STARTED, UUID.randomUUID(), Instant.now(), Map.of()));
-        // no exception propagated
+        assertThatCode(() -> reporter.report(
+                new MatchAuditEvent(UUID.randomUUID(), EventType.MATCH_STARTED, UUID.randomUUID(), Instant.now(), Map.of())))
+                .doesNotThrowAnyException();
     }
 }

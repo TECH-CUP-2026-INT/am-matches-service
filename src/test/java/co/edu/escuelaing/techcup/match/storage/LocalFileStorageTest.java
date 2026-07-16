@@ -36,8 +36,8 @@ class LocalFileStorageTest {
 
         Path stored = Path.of(result);
         assertThat(Files.exists(stored)).isTrue();
-        assertThat(stored.getParent().getFileName().toString()).isEqualTo(matchId.toString());
-        assertThat(stored.getFileName().toString()).isEqualTo("planilla.pdf");
+        assertThat(stored.getParent().getFileName()).hasToString(matchId.toString());
+        assertThat(stored.getFileName()).hasToString("planilla.pdf");
     }
 
     @Test
@@ -50,7 +50,7 @@ class LocalFileStorageTest {
         // Path separators are stripped, so the traversal collapses into a single sanitized
         // file name that stays contained within the match's own storage directory.
         assertThat(stored.startsWith(matchDir)).isTrue();
-        assertThat(stored.getParent()).isEqualTo(matchDir);
+        assertThat(stored).hasParentRaw(matchDir);
     }
 
     @Test
@@ -61,7 +61,7 @@ class LocalFileStorageTest {
         Path stored = Path.of(result);
         Path matchDir = tempDir.resolve(matchId.toString()).toAbsolutePath().normalize();
         assertThat(stored.startsWith(matchDir)).isTrue();
-        assertThat(stored.getFileName().toString()).isEqualTo("archivo");
+        assertThat(stored.getFileName()).hasToString("archivo");
     }
 
     @Test
@@ -70,7 +70,7 @@ class LocalFileStorageTest {
         String result = storage.store(matchId, "archivo con espacios!@#.pdf", "application/pdf", "x".getBytes());
 
         Path stored = Path.of(result);
-        assertThat(stored.getFileName().toString()).isEqualTo("archivo_con_espacios___.pdf");
+        assertThat(stored.getFileName()).hasToString("archivo_con_espacios___.pdf");
     }
 
     @Test
@@ -79,6 +79,6 @@ class LocalFileStorageTest {
         String result = storage.store(matchId, "", "text/plain", "x".getBytes());
 
         Path stored = Path.of(result);
-        assertThat(stored.getFileName().toString()).isEqualTo("archivo");
+        assertThat(stored.getFileName()).hasToString("archivo");
     }
 }

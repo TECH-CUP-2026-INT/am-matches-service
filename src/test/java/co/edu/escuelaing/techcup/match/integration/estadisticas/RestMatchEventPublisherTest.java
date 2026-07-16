@@ -1,7 +1,7 @@
 package co.edu.escuelaing.techcup.match.integration.estadisticas;
 
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -57,15 +57,16 @@ class RestMatchEventPublisherTest {
 
         publisher.publishGoal(new GoalEventPayload(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), 10, 1, 0));
 
-        verify(bodyUriSpec).uri(eq("/api/estadisticas/eventos/gol"));
+        verify(bodyUriSpec).uri("/api/estadisticas/eventos/gol");
     }
 
     @Test
     void publishGoal_restClientException_isSwallowed() {
         when(bodySpec.retrieve()).thenThrow(new RestClientException("down"));
 
-        publisher.publishGoal(new GoalEventPayload(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), 10, 1, 0));
-        // no exception propagated
+        assertThatCode(() -> publisher.publishGoal(
+                new GoalEventPayload(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), 10, 1, 0)))
+                .doesNotThrowAnyException();
     }
 
     @Test
@@ -75,14 +76,16 @@ class RestMatchEventPublisherTest {
 
         publisher.publishCard(new CardEventPayload(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), CardType.YELLOW, 20));
 
-        verify(bodyUriSpec).uri(eq("/api/estadisticas/eventos/tarjeta"));
+        verify(bodyUriSpec).uri("/api/estadisticas/eventos/tarjeta");
     }
 
     @Test
     void publishCard_restClientException_isSwallowed() {
         when(bodySpec.retrieve()).thenThrow(new RestClientException("down"));
 
-        publisher.publishCard(new CardEventPayload(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), CardType.RED, 20));
+        assertThatCode(() -> publisher.publishCard(
+                new CardEventPayload(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), CardType.RED, 20)))
+                .doesNotThrowAnyException();
     }
 
     @Test
@@ -93,14 +96,15 @@ class RestMatchEventPublisherTest {
         publisher.publishSubstitution(new SubstitutionEventPayload(
                 UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), 60));
 
-        verify(bodyUriSpec).uri(eq("/api/estadisticas/eventos/sustitucion"));
+        verify(bodyUriSpec).uri("/api/estadisticas/eventos/sustitucion");
     }
 
     @Test
     void publishSubstitution_restClientException_isSwallowed() {
         when(bodySpec.retrieve()).thenThrow(new RestClientException("down"));
 
-        publisher.publishSubstitution(new SubstitutionEventPayload(
-                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), 60));
+        assertThatCode(() -> publisher.publishSubstitution(new SubstitutionEventPayload(
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), 60)))
+                .doesNotThrowAnyException();
     }
 }

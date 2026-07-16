@@ -3,7 +3,6 @@ package co.edu.escuelaing.techcup.match.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
 import co.edu.escuelaing.techcup.match.dto.request.RegisterSubstitutionRequest;
@@ -12,7 +11,6 @@ import co.edu.escuelaing.techcup.match.entity.Match;
 import co.edu.escuelaing.techcup.match.entity.Substitution;
 import co.edu.escuelaing.techcup.match.entity.enums.MatchPeriod;
 import co.edu.escuelaing.techcup.match.entity.enums.MatchStatus;
-import co.edu.escuelaing.techcup.match.exception.InvalidTeamException;
 import co.edu.escuelaing.techcup.match.integration.auditoria.AuditReporter;
 import co.edu.escuelaing.techcup.match.integration.estadisticas.MatchEventPublisher;
 import co.edu.escuelaing.techcup.match.repository.SubstitutionRepository;
@@ -82,8 +80,9 @@ class SubstitutionServiceImplTest {
     void samePlayerInAndOut_throwsValidationException() {
         when(matchAccessService.requireActiveMatch(matchId, refereeId)).thenReturn(match);
         UUID samePlayer = UUID.randomUUID();
+        RegisterSubstitutionRequest request = new RegisterSubstitutionRequest(teamId, samePlayer, samePlayer, 70);
 
-        assertThrows(ValidationException.class, () -> substitutionService.registerSubstitution(
-                matchId, refereeId, new RegisterSubstitutionRequest(teamId, samePlayer, samePlayer, 70)));
+        assertThrows(ValidationException.class,
+                () -> substitutionService.registerSubstitution(matchId, refereeId, request));
     }
 }

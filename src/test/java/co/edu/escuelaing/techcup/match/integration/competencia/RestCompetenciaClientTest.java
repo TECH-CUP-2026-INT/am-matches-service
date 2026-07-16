@@ -3,8 +3,6 @@ package co.edu.escuelaing.techcup.match.integration.competencia;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -58,7 +56,7 @@ class RestCompetenciaClientTest {
                 java.time.Instant.now(), true);
 
         when(restClient.get()).thenReturn(uriSpec);
-        when(uriSpec.uri(eq("/api/partidos/{id}"), eq(competenciaMatchId))).thenReturn((RestClient.RequestHeadersSpec) headersSpec);
+        when(uriSpec.uri("/api/partidos/{id}", competenciaMatchId)).thenReturn((RestClient.RequestHeadersSpec) headersSpec);
         when(headersSpec.retrieve()).thenReturn(responseSpec);
         when(responseSpec.body(ScheduledMatchInfo.class)).thenReturn(info);
 
@@ -73,7 +71,7 @@ class RestCompetenciaClientTest {
         UUID competenciaMatchId = UUID.randomUUID();
 
         when(restClient.get()).thenReturn(uriSpec);
-        when(uriSpec.uri(eq("/api/partidos/{id}"), eq(competenciaMatchId))).thenReturn((RestClient.RequestHeadersSpec) headersSpec);
+        when(uriSpec.uri("/api/partidos/{id}", competenciaMatchId)).thenReturn((RestClient.RequestHeadersSpec) headersSpec);
         when(headersSpec.retrieve()).thenThrow(new RestClientException("connection refused"));
 
         assertThrows(CompetenciaIntegrationException.class, () -> client.getScheduledMatch(competenciaMatchId));
@@ -88,7 +86,7 @@ class RestCompetenciaClientTest {
                 java.time.Instant.now(), true);
 
         when(restClient.get()).thenReturn(uriSpec);
-        when(uriSpec.uri(eq("/api/partidos?arbitroId={refereeId}"), eq(refereeId))).thenReturn((RestClient.RequestHeadersSpec) headersSpec);
+        when(uriSpec.uri("/api/partidos?arbitroId={refereeId}", refereeId)).thenReturn((RestClient.RequestHeadersSpec) headersSpec);
         when(headersSpec.retrieve()).thenReturn(responseSpec);
         when(responseSpec.body(any(ParameterizedTypeReference.class))).thenReturn(List.of(info));
 
@@ -103,7 +101,7 @@ class RestCompetenciaClientTest {
         UUID refereeId = UUID.randomUUID();
 
         when(restClient.get()).thenReturn(uriSpec);
-        when(uriSpec.uri(eq("/api/partidos?arbitroId={refereeId}"), eq(refereeId))).thenReturn((RestClient.RequestHeadersSpec) headersSpec);
+        when(uriSpec.uri("/api/partidos?arbitroId={refereeId}", refereeId)).thenReturn((RestClient.RequestHeadersSpec) headersSpec);
         when(headersSpec.retrieve()).thenReturn(responseSpec);
         when(responseSpec.body(any(ParameterizedTypeReference.class))).thenReturn(null);
 
@@ -118,7 +116,7 @@ class RestCompetenciaClientTest {
         UUID refereeId = UUID.randomUUID();
 
         when(restClient.get()).thenReturn(uriSpec);
-        when(uriSpec.uri(eq("/api/partidos?arbitroId={refereeId}"), eq(refereeId))).thenReturn((RestClient.RequestHeadersSpec) headersSpec);
+        when(uriSpec.uri("/api/partidos?arbitroId={refereeId}", refereeId)).thenReturn((RestClient.RequestHeadersSpec) headersSpec);
         when(headersSpec.retrieve()).thenThrow(new RestClientException("timeout"));
 
         assertThrows(CompetenciaIntegrationException.class, () -> client.getAssignedMatches(refereeId));

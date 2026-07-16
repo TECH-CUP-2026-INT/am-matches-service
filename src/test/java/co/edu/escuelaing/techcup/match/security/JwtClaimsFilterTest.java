@@ -11,9 +11,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.context.SecurityContextHolder;
 
@@ -51,7 +54,7 @@ class JwtClaimsFilterTest {
         var authentication = SecurityContextHolder.getContext().getAuthentication();
         assertThat(authentication).isNotNull();
         AuthenticatedReferee principal = (AuthenticatedReferee) authentication.getPrincipal();
-        assertThat(principal.userId().toString()).isEqualTo(userId);
+        assertThat(principal.userId()).hasToString(userId);
         assertThat(principal.roles()).containsExactlyInAnyOrder("ARBITRO", "OTRO");
         assertThat(authentication.getAuthorities())
                 .extracting(Object::toString)
@@ -93,12 +96,13 @@ class JwtClaimsFilterTest {
         assertThat(authentication.getAuthorities()).isEmpty();
     }
 
-    @Test
-    void missingAuthorizationHeader_doesNotAuthenticate() throws Exception {
+    @ParameterizedTest
+    @MethodSource("invalidAuthorizationHeaders")
+    void invalidAuthorizationHeader_doesNotAuthenticate(String headerValue) throws Exception {
         HttpServletRequest request = mock(HttpServletRequest.class);
         HttpServletResponse response = mock(HttpServletResponse.class);
         FilterChain chain = mock(FilterChain.class);
-        when(request.getHeader(HttpHeaders.AUTHORIZATION)).thenReturn(null);
+        when(request.getHeader(HttpHeaders.AUTHORIZATION)).thenReturn(headerValue);
 
         filter.doFilterInternal(request, response, chain);
 
@@ -106,16 +110,8 @@ class JwtClaimsFilterTest {
         verify(chain).doFilter(request, response);
     }
 
-    @Test
-    void nonBearerHeader_doesNotAuthenticate() throws Exception {
-        HttpServletRequest request = mock(HttpServletRequest.class);
-        HttpServletResponse response = mock(HttpServletResponse.class);
-        FilterChain chain = mock(FilterChain.class);
-        when(request.getHeader(HttpHeaders.AUTHORIZATION)).thenReturn("Basic abc123");
-
-        filter.doFilterInternal(request, response, chain);
-
-        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+    private static Stream<String> invalidAuthorizationHeaders() {
+        return Stream.of(null, "Basic abc123", "Bearer onlyoneparthere");
     }
 
     @Test
@@ -143,18 +139,5 @@ class JwtClaimsFilterTest {
         filter.doFilterInternal(request, response, chain);
 
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
-    }
-
-    @Test
-    void tokenWithSinglePart_doesNotAuthenticate() throws Exception {
-        HttpServletRequest request = mock(HttpServletRequest.class);
-        HttpServletResponse response = mock(HttpServletResponse.class);
-        FilterChain chain = mock(FilterChain.class);
-        when(request.getHeader(HttpHeaders.AUTHORIZATION)).thenReturn("Bearer onlyoneparthere");
-
-        filter.doFilterInternal(request, response, chain);
-
-        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
-        verify(chain).doFilter(request, response);
     }
 }

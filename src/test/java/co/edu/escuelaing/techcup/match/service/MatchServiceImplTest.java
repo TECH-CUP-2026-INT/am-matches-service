@@ -129,9 +129,10 @@ class MatchServiceImplTest {
         match.setId(UUID.randomUUID());
         match.setStatus(MatchStatus.PAUSED);
 
-        when(matchAccessService.requireOwnedMatch(match.getId(), refereeId)).thenReturn(match);
+        UUID matchId = match.getId();
+        when(matchAccessService.requireOwnedMatch(matchId, refereeId)).thenReturn(match);
 
-        assertThrows(InvalidMatchStateException.class, () -> matchService.pauseMatch(match.getId(), refereeId));
+        assertThrows(InvalidMatchStateException.class, () -> matchService.pauseMatch(matchId, refereeId));
     }
 
     @Test
@@ -156,9 +157,10 @@ class MatchServiceImplTest {
         match.setId(UUID.randomUUID());
         match.setStatus(MatchStatus.FINISHED);
 
-        when(matchAccessService.requireOwnedMatch(match.getId(), refereeId)).thenReturn(match);
+        UUID matchId = match.getId();
+        when(matchAccessService.requireOwnedMatch(matchId, refereeId)).thenReturn(match);
 
-        assertThrows(InvalidMatchStateException.class, () -> matchService.finishMatch(match.getId(), refereeId));
+        assertThrows(InvalidMatchStateException.class, () -> matchService.finishMatch(matchId, refereeId));
     }
 
     @Test

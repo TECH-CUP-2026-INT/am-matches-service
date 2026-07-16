@@ -9,6 +9,7 @@ import co.edu.escuelaing.techcup.match.integration.torneos.TournamentClient;
 import co.edu.escuelaing.techcup.match.repository.CardRepository;
 import co.edu.escuelaing.techcup.match.repository.GoalRepository;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -61,7 +62,7 @@ public class MatchFinishedStatPublisher {
         // Una sola consulta a Torneos por partido (no una por jugador): el tournamentId
         // es el mismo para todos los eventos que salen de este finishMatch().
         UUID tournamentId = tournamentClient.findTournamentIdForMatch(match.getId()).orElse(null);
-        LocalDateTime occurredAt = LocalDateTime.now();
+        LocalDateTime occurredAt = LocalDateTime.now(ZoneOffset.UTC);
         byPlayer.forEach((playerId, aggregate) -> publisher.publish(new MatchStatEvent(
                 playerId, aggregate.teamId, match.getId(), tournamentId, resultFor(match, aggregate.teamId),
                 aggregate.goals, aggregate.yellowCards, aggregate.redCards,

@@ -20,7 +20,7 @@ import org.springframework.context.annotation.Configuration;
  * <p>{@code ignoreDeclarationExceptions(true)} en el RabbitAdmin: por defecto Spring AMQP
  * declara el exchange contra el broker real al arrancar la aplicación, y si esa
  * declaración falla (CloudAMQP caído, credencial no configurada en este entorno), tumba
- * todo el ApplicationContext — no solo la parte de Rabbit. El registro de partidos vía
+ * el ApplicationContext completo — no solo la parte de Rabbit. El registro de partidos vía
  * REST (ver controller/*) no depende de RabbitMQ, así que un broker no disponible nunca
  * debe impedir que el servicio arranque.
  */

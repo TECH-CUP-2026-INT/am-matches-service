@@ -73,7 +73,7 @@ class GoalServiceImplTest {
                 matchId, refereeId, new RegisterGoalRequest(homeTeamId, UUID.randomUUID(), 20));
 
         assertThat(response.homeScore()).isEqualTo(1);
-        assertThat(response.awayScore()).isEqualTo(0);
+        assertThat(response.awayScore()).isZero();
         assertThat(match.getHomeScore()).isEqualTo(1);
     }
 
@@ -83,6 +83,6 @@ class GoalServiceImplTest {
                 matchId, refereeId, new RegisterGoalRequest(awayTeamId, UUID.randomUUID(), 55));
 
         assertThat(response.awayScore()).isEqualTo(1);
-        assertThat(response.homeScore()).isEqualTo(0);
+        assertThat(response.homeScore()).isZero();
     }
 }

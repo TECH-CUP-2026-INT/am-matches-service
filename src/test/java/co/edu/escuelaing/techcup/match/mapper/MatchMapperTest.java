@@ -50,9 +50,9 @@ class MatchMapperTest {
         assertThat(response.status()).isEqualTo(MatchStatus.IN_PROGRESS);
         assertThat(response.currentPeriod()).isEqualTo(MatchPeriod.FIRST_HALF);
         assertThat(response.homeScore()).isEqualTo(1);
-        assertThat(response.awayScore()).isEqualTo(0);
+        assertThat(response.awayScore()).isZero();
         assertThat(response.addedMinutesFirstHalf()).isEqualTo(2);
-        assertThat(response.addedMinutesSecondHalf()).isEqualTo(0);
+        assertThat(response.addedMinutesSecondHalf()).isZero();
         assertThat(response.currentMinute()).isEqualTo(35);
         assertThat(response.startedAt()).isEqualTo(match.getStartedAt());
         assertThat(response.endedAt()).isNull();

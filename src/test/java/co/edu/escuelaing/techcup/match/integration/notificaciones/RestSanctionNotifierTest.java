@@ -1,8 +1,7 @@
 package co.edu.escuelaing.techcup.match.integration.notificaciones;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -57,7 +56,7 @@ class RestSanctionNotifierTest {
 
     @Test
     void constructor_setsInternalApiKeyDefaultHeader() {
-        verify(builder).defaultHeader(eq("X-Internal-Api-Key"), eq("secret-key"));
+        verify(builder).defaultHeader("X-Internal-Api-Key", "secret-key");
     }
 
     @Test
@@ -68,15 +67,15 @@ class RestSanctionNotifierTest {
         notifier.notifyPlayerSanctioned(new PlayerSanctionedPayload(
                 UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), CardType.YELLOW, 2, Instant.now()));
 
-        verify(bodyUriSpec).uri(eq("/api/notificaciones/sanciones"));
+        verify(bodyUriSpec).uri("/api/notificaciones/sanciones");
     }
 
     @Test
     void notifyPlayerSanctioned_restClientException_isSwallowed() {
         when(bodySpec.retrieve()).thenThrow(new RestClientException("down"));
 
-        notifier.notifyPlayerSanctioned(new PlayerSanctionedPayload(
-                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), CardType.RED, 1, Instant.now()));
-        // no exception propagated
+        assertThatCode(() -> notifier.notifyPlayerSanctioned(new PlayerSanctionedPayload(
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), CardType.RED, 1, Instant.now())))
+                .doesNotThrowAnyException();
     }
 }
