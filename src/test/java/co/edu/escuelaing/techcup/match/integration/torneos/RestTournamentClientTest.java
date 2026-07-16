@@ -26,7 +26,7 @@ class RestTournamentClientTest {
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         serverHolder[0] = server;
         IntegrationServicesProperties properties =
-                new IntegrationServicesProperties(null, null, null, null, new ServiceEndpoint(BASE_URL));
+                new IntegrationServicesProperties(null, null, null, new ServiceEndpoint(BASE_URL));
         return new RestTournamentClient(builder, properties);
     }
 

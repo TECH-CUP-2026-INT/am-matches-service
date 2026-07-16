@@ -7,7 +7,6 @@ public record IntegrationServicesProperties(
         ServiceEndpoint competencia,
         ServiceEndpoint estadisticas,
         ServiceEndpoint notificaciones,
-        ServiceEndpoint auditoria,
         ServiceEndpoint torneos
 ) {
 

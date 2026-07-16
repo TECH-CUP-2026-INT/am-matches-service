@@ -6,9 +6,9 @@ import java.util.UUID;
 
 /**
  * Audit log local (solo lectura) de eventos ya ocurridos en este servicio: goles, tarjetas,
- * sustituciones, observaciones y ciclo de vida del partido (inicio/fin). No es la integración
- * con el Servicio de Auditoría externo (best-effort, ver {@code integration.auditoria}); esta
- * consulta agrega datos que ya viven en la base de datos propia del servicio.
+ * sustituciones, observaciones y ciclo de vida del partido (inicio/fin), agregados a partir
+ * de las colecciones propias del dominio (partido, gol, tarjeta, etc.). Distinto de
+ * {@code integration.auditoria}, que persiste un registro de auditoría dedicado por evento.
  */
 public interface MatchEventQueryService {
 

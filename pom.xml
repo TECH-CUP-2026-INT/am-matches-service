@@ -66,13 +66,15 @@
 			<artifactId>micrometer-registry-prometheus</artifactId>
 			<scope>runtime</scope>
 		</dependency>
+		<!-- Micrometer Tracing con el bridge de OpenTelemetry (no Brave): genera trace/span
+		     IDs vía la API de OTel y los exporta a Zipkin con el exporter nativo de OTel. -->
 		<dependency>
 			<groupId>io.micrometer</groupId>
-			<artifactId>micrometer-tracing-bridge-brave</artifactId>
+			<artifactId>micrometer-tracing-bridge-otel</artifactId>
 		</dependency>
 		<dependency>
-			<groupId>io.zipkin.reporter2</groupId>
-			<artifactId>zipkin-reporter-brave</artifactId>
+			<groupId>io.opentelemetry</groupId>
+			<artifactId>opentelemetry-exporter-zipkin</artifactId>
 			<scope>runtime</scope>
 		</dependency>
 		<dependency>
@@ -131,6 +133,15 @@
 						</exclude>
 					</excludes>
 				</configuration>
+				<executions>
+					<!-- Puebla /actuator/info (name, version, build time) sin depender de que
+					     cada endpoint lo declare a mano; ver management.info.* en application.yml. -->
+					<execution>
+						<goals>
+							<goal>build-info</goal>
+						</goals>
+					</execution>
+				</executions>
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
