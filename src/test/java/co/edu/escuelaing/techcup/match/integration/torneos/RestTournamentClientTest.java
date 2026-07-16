@@ -59,4 +59,19 @@ class RestTournamentClientTest {
 
         assertThat(client.findTournamentIdForMatch(matchId)).isEmpty();
     }
+
+    @Test
+    void findTournamentIdForMatch_whenTournamentIdFieldIsNull_returnsEmpty() {
+        MockRestServiceServer[] holder = new MockRestServiceServer[1];
+        RestTournamentClient client = buildClient(holder);
+        UUID matchId = UUID.randomUUID();
+
+        holder[0].expect(requestTo(BASE_URL + "/tournaments/matches/" + matchId + "/tournament"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess(
+                        "{\"matchId\":\"" + matchId + "\",\"tournamentId\":null}",
+                        MediaType.APPLICATION_JSON));
+
+        assertThat(client.findTournamentIdForMatch(matchId)).isEmpty();
+    }
 }

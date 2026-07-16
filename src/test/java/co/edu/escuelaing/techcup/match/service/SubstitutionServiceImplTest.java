@@ -16,6 +16,7 @@ import co.edu.escuelaing.techcup.match.integration.estadisticas.MatchEventPublis
 import co.edu.escuelaing.techcup.match.repository.SubstitutionRepository;
 import jakarta.validation.ValidationException;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -84,5 +85,26 @@ class SubstitutionServiceImplTest {
 
         assertThrows(ValidationException.class,
                 () -> substitutionService.registerSubstitution(matchId, refereeId, request));
+    }
+
+    @Test
+    void listSubstitutions_returnsThemInMinuteOrder() {
+        Substitution substitution = new Substitution();
+        substitution.setId(UUID.randomUUID());
+        substitution.setMatchId(matchId);
+        substitution.setTeamId(teamId);
+        substitution.setPlayerOutId(UUID.randomUUID());
+        substitution.setPlayerInId(UUID.randomUUID());
+        substitution.setMinute(65);
+        substitution.setPeriod(MatchPeriod.SECOND_HALF);
+        substitution.setCreatedAt(Instant.now());
+
+        when(matchAccessService.requireOwnedMatch(matchId, refereeId)).thenReturn(match);
+        when(substitutionRepository.findByMatchIdOrderByMinuteAsc(matchId)).thenReturn(List.of(substitution));
+
+        List<SubstitutionResponse> responses = substitutionService.listSubstitutions(matchId, refereeId);
+
+        assertThat(responses).hasSize(1);
+        assertThat(responses.get(0).minute()).isEqualTo(65);
     }
 }

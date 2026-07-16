@@ -125,6 +125,29 @@ class MatchEventQueryServiceImplTest {
     }
 
     @Test
+    void listEvents_observationWithNullText_keepsDetalleNull() {
+        MatchObservation observation = new MatchObservation();
+        observation.setId(UUID.randomUUID());
+        observation.setMatchId(match.getId());
+        observation.setRefereeId(refereeId);
+        observation.setText(null);
+        observation.setCreatedAt(now.minus(20, ChronoUnit.MINUTES));
+
+        when(matchRepository.findById(matchId)).thenReturn(Optional.of(match));
+        when(goalRepository.findByMatchIdOrderByMinuteAsc(matchId)).thenReturn(List.of());
+        when(cardRepository.findByMatchIdOrderByMinuteAsc(matchId)).thenReturn(List.of());
+        when(substitutionRepository.findByMatchIdOrderByMinuteAsc(matchId)).thenReturn(List.of());
+        when(matchObservationRepository.findByMatchIdOrderByCreatedAtAsc(matchId)).thenReturn(List.of(observation));
+
+        List<MatchEventResponse> events = service.listEvents(matchId);
+
+        assertThat(events)
+                .filteredOn(event -> event.tipo() == MatchEventType.OBSERVACION)
+                .singleElement()
+                .satisfies(event -> assertThat(event.detalle()).isNull());
+    }
+
+    @Test
     void listEvents_noMatchId_queriesAcrossAllMatches() {
         when(matchRepository.findAll()).thenReturn(List.of(match));
         when(goalRepository.findAll()).thenReturn(List.of());

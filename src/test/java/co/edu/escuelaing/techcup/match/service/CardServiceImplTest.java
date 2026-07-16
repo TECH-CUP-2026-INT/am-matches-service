@@ -23,6 +23,7 @@ import co.edu.escuelaing.techcup.match.integration.estadisticas.MatchEventPublis
 import co.edu.escuelaing.techcup.match.integration.notificaciones.SanctionNotifier;
 import co.edu.escuelaing.techcup.match.repository.CardRepository;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -110,6 +111,37 @@ class CardServiceImplTest {
         assertThat(response.cardType()).isEqualTo(CardType.RED);
         verify(sanctionNotifier).notifyPlayerSanctioned(any());
         verify(cardRepository, never()).countByMatchIdAndPlayerIdAndCardType(any(), any(), any());
+    }
+
+    @Test
+    void listCards_secondYellowForSamePlayer_isSanctionedButOthersAreNot() {
+        UUID otherPlayerId = UUID.randomUUID();
+        Card firstYellow = cardOf(playerId, CardType.YELLOW, 10);
+        Card secondYellow = cardOf(playerId, CardType.YELLOW, 40);
+        Card redForOtherPlayer = cardOf(otherPlayerId, CardType.RED, 60);
+        when(matchAccessService.requireOwnedMatch(matchId, refereeId)).thenReturn(match);
+        when(cardRepository.findByMatchIdOrderByMinuteAsc(matchId))
+                .thenReturn(List.of(firstYellow, secondYellow, redForOtherPlayer));
+
+        List<CardResponse> responses = cardService.listCards(matchId, refereeId);
+
+        assertThat(responses).hasSize(3);
+        assertThat(responses.get(0).playerSanctioned()).isFalse();
+        assertThat(responses.get(1).playerSanctioned()).isTrue();
+        assertThat(responses.get(2).playerSanctioned()).isTrue();
+    }
+
+    private Card cardOf(UUID player, CardType type, int minute) {
+        Card card = new Card();
+        card.setId(UUID.randomUUID());
+        card.setMatchId(matchId);
+        card.setTeamId(teamId);
+        card.setPlayerId(player);
+        card.setCardType(type);
+        card.setMinute(minute);
+        card.setPeriod(MatchPeriod.FIRST_HALF);
+        card.setCreatedAt(Instant.now());
+        return card;
     }
 
     @Test

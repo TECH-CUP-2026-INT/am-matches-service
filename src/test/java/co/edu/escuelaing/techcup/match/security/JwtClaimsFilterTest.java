@@ -128,6 +128,22 @@ class JwtClaimsFilterTest {
     }
 
     @Test
+    void payloadWithInvalidBase64_isCaughtAndChainContinues() throws Exception {
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        HttpServletResponse response = mock(HttpServletResponse.class);
+        FilterChain chain = mock(FilterChain.class);
+        // Dos partes separadas por punto (pasa el chequeo de longitud mínima), pero el
+        // payload no es Base64 válido: Base64.getUrlDecoder().decode lanza IllegalArgumentException,
+        // que debe quedar atrapada por el catch genérico del filtro.
+        when(request.getHeader(HttpHeaders.AUTHORIZATION)).thenReturn("Bearer header.!!!not-valid-base64!!!");
+
+        filter.doFilterInternal(request, response, chain);
+
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        verify(chain).doFilter(request, response);
+    }
+
+    @Test
     void tokenWithoutSubjectClaim_doesNotAuthenticate() throws Exception {
         String token = buildToken("{\"roles\":[\"ARBITRO\"]}");
 

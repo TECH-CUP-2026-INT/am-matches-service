@@ -1,9 +1,11 @@
 package co.edu.escuelaing.techcup.match.storage;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import co.edu.escuelaing.techcup.match.config.StorageProperties;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
@@ -80,5 +82,16 @@ class LocalFileStorageTest {
 
         Path stored = Path.of(result);
         assertThat(stored.getFileName()).hasToString("archivo");
+    }
+
+    @Test
+    void store_whenMatchDirectoryPathIsBlockedByAFile_wrapsIOExceptionAsUnchecked() throws IOException {
+        UUID matchId = UUID.randomUUID();
+        // Un archivo regular ya ocupa el path donde debería crearse el directorio del
+        // partido: Files.createDirectories no puede crear un directorio ahí y lanza IOException.
+        Files.write(tempDir.resolve(matchId.toString()), "ocupado".getBytes());
+
+        assertThrows(UncheckedIOException.class,
+                () -> storage.store(matchId, "planilla.pdf", "application/pdf", "x".getBytes()));
     }
 }

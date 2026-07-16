@@ -28,6 +28,13 @@
 	</scm>
 	<properties>
 		<java.version>21</java.version>
+		<!-- Alinea la cobertura reportada a SonarCloud con las exclusiones del jacoco-maven-plugin
+		     de abajo: sin esto, Sonar cuenta config/dto/entity/ServiceMatchApplication como 0%
+		     cubiertos (ausentes del jacoco.xml por esas mismas exclusiones) y castiga el % global
+		     por clases de wiring/datos sin lógica de negocio que testear. -->
+		<sonar.coverage.exclusions>
+			**/config/**,**/dto/**,**/entity/**,**/ServiceMatchApplication.java
+		</sonar.coverage.exclusions>
 	</properties>
 	<dependencies>
 		<dependency>

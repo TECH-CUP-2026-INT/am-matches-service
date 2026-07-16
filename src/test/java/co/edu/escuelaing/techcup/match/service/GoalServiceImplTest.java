@@ -2,6 +2,7 @@ package co.edu.escuelaing.techcup.match.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import co.edu.escuelaing.techcup.match.dto.request.RegisterGoalRequest;
@@ -15,6 +16,7 @@ import co.edu.escuelaing.techcup.match.integration.estadisticas.MatchEventPublis
 import co.edu.escuelaing.techcup.match.repository.GoalRepository;
 import co.edu.escuelaing.techcup.match.repository.MatchRepository;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -58,8 +60,8 @@ class GoalServiceImplTest {
         match.setStatus(MatchStatus.IN_PROGRESS);
         match.setPeriodStartedAt(Instant.now());
 
-        when(matchAccessService.requireActiveMatch(matchId, refereeId)).thenReturn(match);
-        when(goalRepository.save(any(Goal.class))).thenAnswer(invocation -> {
+        lenient().when(matchAccessService.requireActiveMatch(matchId, refereeId)).thenReturn(match);
+        lenient().when(goalRepository.save(any(Goal.class))).thenAnswer(invocation -> {
             Goal goal = invocation.getArgument(0);
             goal.setId(UUID.randomUUID());
             goal.setCreatedAt(Instant.now());
@@ -84,5 +86,35 @@ class GoalServiceImplTest {
 
         assertThat(response.awayScore()).isEqualTo(1);
         assertThat(response.homeScore()).isZero();
+    }
+
+    @Test
+    void listGoals_computesRunningScorePerTeamInMinuteOrder() {
+        Goal homeGoal = goalOf(homeTeamId, 10);
+        Goal awayGoal = goalOf(awayTeamId, 30);
+        Goal secondHomeGoal = goalOf(homeTeamId, 50);
+        when(matchAccessService.requireOwnedMatch(matchId, refereeId)).thenReturn(match);
+        when(goalRepository.findByMatchIdOrderByMinuteAsc(matchId))
+                .thenReturn(List.of(homeGoal, awayGoal, secondHomeGoal));
+
+        List<GoalResponse> responses = goalService.listGoals(matchId, refereeId);
+
+        assertThat(responses).hasSize(3);
+        assertThat(responses.get(0).homeScore()).isEqualTo(1);
+        assertThat(responses.get(0).awayScore()).isZero();
+        assertThat(responses.get(1).awayScore()).isEqualTo(1);
+        assertThat(responses.get(2).homeScore()).isEqualTo(2);
+    }
+
+    private Goal goalOf(UUID teamId, int minute) {
+        Goal goal = new Goal();
+        goal.setId(UUID.randomUUID());
+        goal.setMatchId(matchId);
+        goal.setTeamId(teamId);
+        goal.setPlayerId(UUID.randomUUID());
+        goal.setMinute(minute);
+        goal.setPeriod(MatchPeriod.FIRST_HALF);
+        goal.setCreatedAt(Instant.now());
+        return goal;
     }
 }
