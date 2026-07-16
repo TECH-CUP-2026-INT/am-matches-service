@@ -120,7 +120,7 @@ jobs:
 
     runs-on: ubuntu-latest
 
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/qa' || github.ref == 'refs/heads/develop'
 
     permissions:
       contents: read
@@ -153,8 +153,8 @@ jobs:
         with:
           images: ghcr.io/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=ref,event=branch
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=qa,enable=${{ github.ref == 'refs/heads/qa' }}\n            
             type=sha
 
       - name: Construir y publicar imagen Docker
@@ -172,7 +172,7 @@ jobs:
 
     needs: dockerize-publish
 
-    if: github.ref == 'refs/heads/main' && needs.dockerize-publish.outputs.azure_secret_present == 'true'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/qa' && needs.dockerize-publish.outputs.azure_secret_present == 'true'
 
     runs-on: ubuntu-latest
 
@@ -188,3 +188,4 @@ jobs:
           app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           images: ghcr.io/${{ env.IMAGE_NAME }}:latest
+
