@@ -6,7 +6,7 @@
 Microservicio responsable del **arbitraje en tiempo real** de los partidos del torneo
 universitario TechCup Fútbol. Es uno de ~12 microservicios independientes de la
 plataforma; su único actor es el **árbitro** y su única responsabilidad es la
-ejecución 
+ejecución en vivo del partido
 
 ## Qué SÍ hace este servicio
 
