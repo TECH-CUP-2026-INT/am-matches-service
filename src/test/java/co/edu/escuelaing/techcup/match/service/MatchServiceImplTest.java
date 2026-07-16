@@ -15,6 +15,7 @@ import co.edu.escuelaing.techcup.match.exception.MatchNotReadyException;
 import co.edu.escuelaing.techcup.match.integration.auditoria.AuditReporter;
 import co.edu.escuelaing.techcup.match.integration.competencia.CompetenciaClient;
 import co.edu.escuelaing.techcup.match.integration.competencia.ScheduledMatchInfo;
+import co.edu.escuelaing.techcup.match.messaging.MatchFinishedStatPublisher;
 import co.edu.escuelaing.techcup.match.repository.MatchRepository;
 import java.time.Instant;
 import java.util.Optional;
@@ -36,6 +37,8 @@ class MatchServiceImplTest {
     private CompetenciaClient competenciaClient;
     @Mock
     private AuditReporter auditReporter;
+    @Mock
+    private MatchFinishedStatPublisher matchFinishedStatPublisher;
 
     private MatchServiceImpl matchService;
 
@@ -44,7 +47,8 @@ class MatchServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        matchService = new MatchServiceImpl(matchRepository, matchAccessService, competenciaClient, auditReporter);
+        matchService = new MatchServiceImpl(
+                matchRepository, matchAccessService, competenciaClient, auditReporter, matchFinishedStatPublisher);
     }
 
     @Test
@@ -173,5 +177,6 @@ class MatchServiceImplTest {
         assertThat(response.status()).isEqualTo(MatchStatus.FINISHED);
         assertThat(match.getEndedAt()).isNotNull();
         verify(auditReporter).report(any());
+        verify(matchFinishedStatPublisher).publishStatsFor(match);
     }
 }
