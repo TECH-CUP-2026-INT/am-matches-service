@@ -46,3 +46,22 @@ techcup:
       base-url: ${NOTIFICACIONES_SERVICE_URL:http://localhost:8083}
     auditoria:
       base-url: ${AUDITORIA_SERVICE_URL:http://localhost:8084}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_ENDPOINT:http://localhost:9411/api/v2/spans}
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING:1.0}
+
+logging:
+  level:
+    co.edu.escuelaing.techcup.match: INFO
