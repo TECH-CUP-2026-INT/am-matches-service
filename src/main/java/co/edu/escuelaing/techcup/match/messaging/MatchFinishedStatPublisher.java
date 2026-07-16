@@ -5,6 +5,7 @@ import co.edu.escuelaing.techcup.match.entity.Goal;
 import co.edu.escuelaing.techcup.match.entity.Match;
 import co.edu.escuelaing.techcup.match.entity.enums.CardType;
 import co.edu.escuelaing.techcup.match.entity.enums.MatchResult;
+import co.edu.escuelaing.techcup.match.integration.torneos.TournamentClient;
 import co.edu.escuelaing.techcup.match.repository.CardRepository;
 import co.edu.escuelaing.techcup.match.repository.GoalRepository;
 import java.time.LocalDateTime;
@@ -28,12 +29,14 @@ public class MatchFinishedStatPublisher {
     private final GoalRepository goalRepository;
     private final CardRepository cardRepository;
     private final MatchStatEventPublisher publisher;
+    private final TournamentClient tournamentClient;
 
-    public MatchFinishedStatPublisher(
-            GoalRepository goalRepository, CardRepository cardRepository, MatchStatEventPublisher publisher) {
+    public MatchFinishedStatPublisher(GoalRepository goalRepository, CardRepository cardRepository,
+            MatchStatEventPublisher publisher, TournamentClient tournamentClient) {
         this.goalRepository = goalRepository;
         this.cardRepository = cardRepository;
         this.publisher = publisher;
+        this.tournamentClient = tournamentClient;
     }
 
     public void publishStatsFor(Match match) {
@@ -51,9 +54,16 @@ public class MatchFinishedStatPublisher {
             }
         }
 
+        if (byPlayer.isEmpty()) {
+            return;
+        }
+
+        // Una sola consulta a Torneos por partido (no una por jugador): el tournamentId
+        // es el mismo para todos los eventos que salen de este finishMatch().
+        UUID tournamentId = tournamentClient.findTournamentIdForMatch(match.getId()).orElse(null);
         LocalDateTime occurredAt = LocalDateTime.now();
         byPlayer.forEach((playerId, aggregate) -> publisher.publish(new MatchStatEvent(
-                playerId, aggregate.teamId, match.getId(), null, resultFor(match, aggregate.teamId),
+                playerId, aggregate.teamId, match.getId(), tournamentId, resultFor(match, aggregate.teamId),
                 aggregate.goals, aggregate.yellowCards, aggregate.redCards,
                 0, 0, 0, false, occurredAt)));
     }

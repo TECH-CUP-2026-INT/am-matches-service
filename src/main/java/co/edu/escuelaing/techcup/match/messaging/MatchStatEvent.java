@@ -11,11 +11,14 @@ import java.util.UUID;
  *
  * <p>{@code foulsCommitted}, {@code minutesPlayed}, {@code assists} y {@code goalkeeper}
  * van siempre en 0/false: este servicio no trackea faltas, minutos jugados, asistencias
- * ni rol de arquero. {@code tournamentId} va siempre null: no hay ninguna fuente de ese
- * dato hoy (el Servicio de Competencia del que este repo depende para datos de
- * programación — ver CompetenciaClient — ni siquiera está desplegado, y su contrato no
- * incluye tournamentId). Confirmado con Estadísticas que está bien mandarlo así mientras
+ * ni rol de arquero. Confirmado con Estadísticas que está bien mandarlos así mientras
  * esos datos no existan.
+ *
+ * <p>{@code tournamentId} se resuelve consultando a Torneos
+ * (GET /tournaments/matches/{matchId}/tournament — ver TournamentClient) justo antes de
+ * publicar. Si Torneos no responde o no tiene registrado el partido, va null en vez de
+ * bloquear la publicación (best-effort, mismo criterio que el resto de integraciones
+ * salientes de este servicio).
  */
 public record MatchStatEvent(
         UUID playerId,

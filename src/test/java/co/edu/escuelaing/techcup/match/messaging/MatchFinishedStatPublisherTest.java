@@ -3,6 +3,7 @@ package co.edu.escuelaing.techcup.match.messaging;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -12,9 +13,11 @@ import co.edu.escuelaing.techcup.match.entity.Goal;
 import co.edu.escuelaing.techcup.match.entity.Match;
 import co.edu.escuelaing.techcup.match.entity.enums.CardType;
 import co.edu.escuelaing.techcup.match.entity.enums.MatchResult;
+import co.edu.escuelaing.techcup.match.integration.torneos.TournamentClient;
 import co.edu.escuelaing.techcup.match.repository.CardRepository;
 import co.edu.escuelaing.techcup.match.repository.GoalRepository;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -24,8 +27,9 @@ class MatchFinishedStatPublisherTest {
     private final GoalRepository goalRepository = mock(GoalRepository.class);
     private final CardRepository cardRepository = mock(CardRepository.class);
     private final MatchStatEventPublisher publisher = mock(MatchStatEventPublisher.class);
+    private final TournamentClient tournamentClient = mock(TournamentClient.class);
     private final MatchFinishedStatPublisher statPublisher =
-            new MatchFinishedStatPublisher(goalRepository, cardRepository, publisher);
+            new MatchFinishedStatPublisher(goalRepository, cardRepository, publisher, tournamentClient);
 
     private Match matchWonByHome() {
         UUID homeTeamId = UUID.randomUUID();
@@ -43,6 +47,8 @@ class MatchFinishedStatPublisherTest {
     void publishStatsFor_playerWithGoalsAndCards_aggregatesAndPublishesOncePerPlayer() {
         Match match = matchWonByHome();
         UUID playerId = UUID.randomUUID();
+        UUID tournamentId = UUID.randomUUID();
+        when(tournamentClient.findTournamentIdForMatch(match.getId())).thenReturn(Optional.of(tournamentId));
 
         Goal goal1 = new Goal();
         goal1.setPlayerId(playerId);
@@ -69,11 +75,30 @@ class MatchFinishedStatPublisherTest {
         assertThat(event.yellowCards()).isEqualTo(1);
         assertThat(event.redCards()).isEqualTo(0);
         assertThat(event.result()).isEqualTo(MatchResult.WON);
-        assertThat(event.tournamentId()).isNull();
+        assertThat(event.tournamentId()).isEqualTo(tournamentId);
         assertThat(event.foulsCommitted()).isZero();
         assertThat(event.minutesPlayed()).isZero();
         assertThat(event.assists()).isZero();
         assertThat(event.goalkeeper()).isFalse();
+    }
+
+    @Test
+    void publishStatsFor_whenTournamentLookupFails_tournamentIdIsNullButEventStillPublishes() {
+        Match match = matchWonByHome();
+        UUID playerId = UUID.randomUUID();
+        when(tournamentClient.findTournamentIdForMatch(match.getId())).thenReturn(Optional.empty());
+
+        Goal goal = new Goal();
+        goal.setPlayerId(playerId);
+        goal.setTeamId(match.getHomeTeamId());
+        when(goalRepository.findByMatchIdOrderByMinuteAsc(match.getId())).thenReturn(List.of(goal));
+        when(cardRepository.findByMatchIdOrderByMinuteAsc(match.getId())).thenReturn(List.of());
+
+        statPublisher.publishStatsFor(match);
+
+        ArgumentCaptor<MatchStatEvent> captor = ArgumentCaptor.forClass(MatchStatEvent.class);
+        verify(publisher).publish(captor.capture());
+        assertThat(captor.getValue().tournamentId()).isNull();
     }
 
     @Test
@@ -126,5 +151,6 @@ class MatchFinishedStatPublisherTest {
         statPublisher.publishStatsFor(match);
 
         verify(publisher, times(0)).publish(any());
+        verify(tournamentClient, never()).findTournamentIdForMatch(any());
     }
 }

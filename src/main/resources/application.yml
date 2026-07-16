@@ -58,3 +58,7 @@ techcup:
       base-url: ${NOTIFICACIONES_SERVICE_URL:http://localhost:8083}
     auditoria:
       base-url: ${AUDITORIA_SERVICE_URL:http://localhost:8084}
+    torneos:
+      # Para resolver el tournamentId de un partido antes de publicar
+      # techcup.match.event.stat — ver TournamentClient.
+      base-url: ${TORNEOS_SERVICE_URL:http://localhost:8090}
