@@ -66,6 +66,7 @@ jobs:
       - name: Ejecutar pruebas
         env:
           SPRING_DATA_MONGODB_URI: mongodb://localhost:27017/matches_db_test
+          RABBITMQ_PASS: ${{ secrets.RABBITMQ_PASS }}
         run: ./mvnw --batch-mode --no-transfer-progress test
 
       - name: Publicar reporte de pruebas
