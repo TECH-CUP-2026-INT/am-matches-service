@@ -24,6 +24,11 @@ spring:
     virtual-host: exdntvvm
     ssl:
       enabled: true
+    # Falla rápido si el broker no responde, en vez de colgar el arranque del
+    # servicio (RabbitAdmin igual tolera que la declaración falle — ver
+    # RabbitMQConfig — pero sin esto el intento de conexión inicial puede
+    # tardar hasta el timeout por defecto del cliente de RabbitMQ).
+    connection-timeout: 5000
 
   servlet:
     multipart:

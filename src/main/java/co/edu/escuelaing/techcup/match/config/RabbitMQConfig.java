@@ -2,6 +2,7 @@ package co.edu.escuelaing.techcup.match.config;
 
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
+import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
@@ -15,6 +16,13 @@ import org.springframework.context.annotation.Configuration;
  * no publica nada: {@code techcup.match.event.stat} requiere datos por jugador que hoy no
  * se trackean acá (faltas, minutos jugados, asistencias, arquero, tournamentId). Este
  * config solo deja lista la conexión para cuando esos datos existan.
+ *
+ * <p>{@code ignoreDeclarationExceptions(true)} en el RabbitAdmin: por defecto Spring AMQP
+ * declara el exchange contra el broker real al arrancar la aplicación, y si esa
+ * declaración falla (CloudAMQP caído, credencial no configurada en este entorno), tumba
+ * todo el ApplicationContext — no solo la parte de Rabbit. El registro de partidos vía
+ * REST (ver controller/*) no depende de RabbitMQ, así que un broker no disponible nunca
+ * debe impedir que el servicio arranque.
  */
 @Configuration
 public class RabbitMQConfig {
@@ -36,5 +44,12 @@ public class RabbitMQConfig {
         RabbitTemplate template = new RabbitTemplate(connectionFactory);
         template.setMessageConverter(messageConverter);
         return template;
+    }
+
+    @Bean
+    public RabbitAdmin rabbitAdmin(ConnectionFactory connectionFactory) {
+        RabbitAdmin admin = new RabbitAdmin(connectionFactory);
+        admin.setIgnoreDeclarationExceptions(true);
+        return admin;
     }
 }
