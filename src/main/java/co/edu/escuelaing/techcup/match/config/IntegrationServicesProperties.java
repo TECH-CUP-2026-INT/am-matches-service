@@ -7,7 +7,8 @@ public record IntegrationServicesProperties(
         ServiceEndpoint competencia,
         ServiceEndpoint estadisticas,
         ServiceEndpoint notificaciones,
-        ServiceEndpoint auditoria
+        ServiceEndpoint auditoria,
+        ServiceEndpoint torneos
 ) {
 
     public record ServiceEndpoint(String baseUrl) {

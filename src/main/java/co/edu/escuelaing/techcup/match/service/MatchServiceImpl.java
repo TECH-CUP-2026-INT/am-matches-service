@@ -14,6 +14,7 @@ import co.edu.escuelaing.techcup.match.integration.auditoria.MatchAuditEvent;
 import co.edu.escuelaing.techcup.match.integration.competencia.CompetenciaClient;
 import co.edu.escuelaing.techcup.match.integration.competencia.ScheduledMatchInfo;
 import co.edu.escuelaing.techcup.match.mapper.MatchMapper;
+import co.edu.escuelaing.techcup.match.messaging.MatchFinishedStatPublisher;
 import co.edu.escuelaing.techcup.match.repository.MatchRepository;
 import java.time.Duration;
 import java.time.Instant;
@@ -30,15 +31,18 @@ public class MatchServiceImpl implements MatchService {
     private final MatchAccessService matchAccessService;
     private final CompetenciaClient competenciaClient;
     private final AuditReporter auditReporter;
+    private final MatchFinishedStatPublisher matchFinishedStatPublisher;
 
     public MatchServiceImpl(MatchRepository matchRepository,
                              MatchAccessService matchAccessService,
                              CompetenciaClient competenciaClient,
-                             AuditReporter auditReporter) {
+                             AuditReporter auditReporter,
+                             MatchFinishedStatPublisher matchFinishedStatPublisher) {
         this.matchRepository = matchRepository;
         this.matchAccessService = matchAccessService;
         this.competenciaClient = competenciaClient;
         this.auditReporter = auditReporter;
+        this.matchFinishedStatPublisher = matchFinishedStatPublisher;
     }
 
     @Override
@@ -198,6 +202,7 @@ public class MatchServiceImpl implements MatchService {
         match = matchRepository.save(match);
 
         auditReporter.report(new MatchAuditEvent(match.getId(), EventType.MATCH_FINISHED, refereeId, now, Map.of()));
+        matchFinishedStatPublisher.publishStatsFor(match);
 
         return MatchMapper.toResponse(match, MatchClock.currentMinute(match), EventType.MATCH_FINISHED);
     }

@@ -13,6 +13,18 @@ spring:
       uri: ${MONGODB_URI:mongodb://localhost:27017/techcup_matches}
       auto-index-creation: true
 
+  # CloudAMQP compartido por todo el ecosistema TechCup (mismo broker que usan
+  # Torneos y Estadísticas). RABBITMQ_PASS nunca debe quedar en este archivo:
+  # solo se define como variable de entorno / secreto de despliegue.
+  rabbitmq:
+    host: toucan.lmq.cloudamqp.com
+    port: 5671
+    username: exdntvvm
+    password: ${RABBITMQ_PASS:}
+    virtual-host: exdntvvm
+    ssl:
+      enabled: true
+
   servlet:
     multipart:
       max-file-size: 10MB
@@ -46,6 +58,10 @@ techcup:
       base-url: ${NOTIFICACIONES_SERVICE_URL:http://localhost:8083}
     auditoria:
       base-url: ${AUDITORIA_SERVICE_URL:http://localhost:8084}
+    torneos:
+      # Para resolver el tournamentId de un partido antes de publicar
+      # techcup.match.event.stat — ver TournamentClient.
+      base-url: ${TORNEOS_SERVICE_URL:http://localhost:8090}
 
 management:
   endpoints:
