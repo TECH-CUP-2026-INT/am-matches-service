@@ -3,22 +3,30 @@ package co.edu.escuelaing.techcup.match.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import co.edu.escuelaing.techcup.match.dto.request.FinishMatchRequest;
+import co.edu.escuelaing.techcup.match.dto.request.MatchDefinitionRequest;
 import co.edu.escuelaing.techcup.match.dto.response.MatchResponse;
 import co.edu.escuelaing.techcup.match.dto.response.MatchSummaryResponse;
 import co.edu.escuelaing.techcup.match.entity.Match;
 import co.edu.escuelaing.techcup.match.entity.enums.MatchPeriod;
+import co.edu.escuelaing.techcup.match.entity.enums.MatchPhase;
 import co.edu.escuelaing.techcup.match.entity.enums.MatchStatus;
 import co.edu.escuelaing.techcup.match.exception.InvalidMatchStateException;
+import co.edu.escuelaing.techcup.match.exception.InvalidTeamException;
 import co.edu.escuelaing.techcup.match.exception.MatchAccessDeniedException;
+import co.edu.escuelaing.techcup.match.exception.MatchNotFoundException;
 import co.edu.escuelaing.techcup.match.exception.MatchNotReadyException;
+import co.edu.escuelaing.techcup.match.exception.PenaltyShootoutRequiredException;
 import co.edu.escuelaing.techcup.match.integration.auditoria.AuditReporter;
-import co.edu.escuelaing.techcup.match.integration.competencia.CompetenciaClient;
-import co.edu.escuelaing.techcup.match.integration.competencia.ScheduledMatchInfo;
+import co.edu.escuelaing.techcup.match.messaging.MatchFinishedEvent;
+import co.edu.escuelaing.techcup.match.messaging.MatchFinishedEventPublisher;
 import co.edu.escuelaing.techcup.match.messaging.MatchFinishedStatPublisher;
 import co.edu.escuelaing.techcup.match.repository.MatchRepository;
+import jakarta.validation.ValidationException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -26,6 +34,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -37,11 +46,11 @@ class MatchServiceImplTest {
     @Mock
     private MatchAccessService matchAccessService;
     @Mock
-    private CompetenciaClient competenciaClient;
-    @Mock
     private AuditReporter auditReporter;
     @Mock
     private MatchFinishedStatPublisher matchFinishedStatPublisher;
+    @Mock
+    private MatchFinishedEventPublisher matchFinishedEventPublisher;
 
     private MatchServiceImpl matchService;
 
@@ -51,40 +60,73 @@ class MatchServiceImplTest {
     @BeforeEach
     void setUp() {
         matchService = new MatchServiceImpl(
-                matchRepository, matchAccessService, competenciaClient, auditReporter, matchFinishedStatPublisher);
+                matchRepository, matchAccessService, auditReporter, matchFinishedStatPublisher, matchFinishedEventPublisher);
+    }
+
+    private MatchDefinitionRequest sampleDefinition(MatchPhase phase, Instant kickoff) {
+        var utc = kickoff.atZone(java.time.ZoneOffset.UTC);
+        return new MatchDefinitionRequest(
+                competenciaMatchId, UUID.randomUUID(), phase, UUID.randomUUID(), UUID.randomUUID(),
+                "Local", "Visitante", utc.toLocalDate(), utc.toLocalTime(), refereeId, UUID.randomUUID());
     }
 
     @Test
-    void startMatch_lineupNotConfirmed_throwsMatchNotReadyException() {
-        when(competenciaClient.getScheduledMatch(competenciaMatchId)).thenReturn(new ScheduledMatchInfo(
-                competenciaMatchId, UUID.randomUUID(), UUID.randomUUID(), "Local", "Visitante",
-                Instant.now().minusSeconds(60), false));
+    void receiveMatchDefinition_newMatch_createsScheduledMatch() {
+        when(matchRepository.findByCompetenciaMatchId(competenciaMatchId)).thenReturn(Optional.empty());
+        when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        assertThrows(MatchNotReadyException.class, () -> matchService.startMatch(competenciaMatchId, refereeId));
+        MatchResponse response = matchService.receiveMatchDefinition(
+                sampleDefinition(MatchPhase.GRUPOS, Instant.now().plusSeconds(3600)));
+
+        assertThat(response.status()).isEqualTo(MatchStatus.SCHEDULED);
+        assertThat(response.competenciaMatchId()).isEqualTo(competenciaMatchId);
+        assertThat(response.phase()).isEqualTo(MatchPhase.GRUPOS);
+        verify(matchRepository).save(any(Match.class));
+    }
+
+    @Test
+    void receiveMatchDefinition_alreadyExists_isIdempotentAndDoesNotSaveAgain() {
+        Match existing = new Match();
+        existing.setId(UUID.randomUUID());
+        existing.setCompetenciaMatchId(competenciaMatchId);
+        existing.setStatus(MatchStatus.SCHEDULED);
+        when(matchRepository.findByCompetenciaMatchId(competenciaMatchId)).thenReturn(Optional.of(existing));
+
+        MatchResponse response = matchService.receiveMatchDefinition(
+                sampleDefinition(MatchPhase.GRUPOS, Instant.now()));
+
+        assertThat(response.id()).isEqualTo(existing.getId());
+        verify(matchRepository, org.mockito.Mockito.never()).save(any());
+    }
+
+    @Test
+    void startMatch_matchNotReceivedYet_throwsMatchNotFoundException() {
+        when(matchRepository.findByCompetenciaMatchId(competenciaMatchId)).thenReturn(Optional.empty());
+
+        assertThrows(MatchNotFoundException.class, () -> matchService.startMatch(competenciaMatchId, refereeId));
     }
 
     @Test
     void startMatch_beforeScheduledKickoff_throwsMatchNotReadyException() {
-        when(competenciaClient.getScheduledMatch(competenciaMatchId)).thenReturn(new ScheduledMatchInfo(
-                competenciaMatchId, UUID.randomUUID(), UUID.randomUUID(), "Local", "Visitante",
-                Instant.now().plusSeconds(3600), true));
+        Match match = new Match();
+        match.setId(UUID.randomUUID());
+        match.setRefereeId(refereeId);
+        match.setStatus(MatchStatus.SCHEDULED);
+        match.setScheduledKickoff(Instant.now().plusSeconds(3600));
+        when(matchRepository.findByCompetenciaMatchId(competenciaMatchId)).thenReturn(Optional.of(match));
 
         assertThrows(MatchNotReadyException.class, () -> matchService.startMatch(competenciaMatchId, refereeId));
     }
 
     @Test
-    void startMatch_readyWithNoExistingRecord_startsMatchInFirstHalf() {
-        when(competenciaClient.getScheduledMatch(competenciaMatchId)).thenReturn(new ScheduledMatchInfo(
-                competenciaMatchId, UUID.randomUUID(), UUID.randomUUID(), "Local", "Visitante",
-                Instant.now().minusSeconds(60), true));
-        when(matchRepository.findByCompetenciaMatchId(competenciaMatchId)).thenReturn(Optional.empty());
-        when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> {
-            Match match = invocation.getArgument(0);
-            if (match.getId() == null) {
-                match.setId(UUID.randomUUID());
-            }
-            return match;
-        });
+    void startMatch_readyAndScheduled_startsMatchInFirstHalf() {
+        Match match = new Match();
+        match.setId(UUID.randomUUID());
+        match.setRefereeId(refereeId);
+        match.setStatus(MatchStatus.SCHEDULED);
+        match.setScheduledKickoff(Instant.now().minusSeconds(60));
+        when(matchRepository.findByCompetenciaMatchId(competenciaMatchId)).thenReturn(Optional.of(match));
+        when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         MatchResponse response = matchService.startMatch(competenciaMatchId, refereeId);
 
@@ -95,30 +137,22 @@ class MatchServiceImplTest {
 
     @Test
     void startMatch_wrongReferee_throwsMatchAccessDeniedException() {
-        Match existing = new Match();
-        existing.setId(UUID.randomUUID());
-        existing.setRefereeId(UUID.randomUUID());
-        existing.setStatus(MatchStatus.SCHEDULED);
-
-        when(competenciaClient.getScheduledMatch(competenciaMatchId)).thenReturn(new ScheduledMatchInfo(
-                competenciaMatchId, UUID.randomUUID(), UUID.randomUUID(), "Local", "Visitante",
-                Instant.now().minusSeconds(60), true));
-        when(matchRepository.findByCompetenciaMatchId(competenciaMatchId)).thenReturn(Optional.of(existing));
+        Match match = new Match();
+        match.setId(UUID.randomUUID());
+        match.setRefereeId(UUID.randomUUID());
+        match.setStatus(MatchStatus.SCHEDULED);
+        when(matchRepository.findByCompetenciaMatchId(competenciaMatchId)).thenReturn(Optional.of(match));
 
         assertThrows(MatchAccessDeniedException.class, () -> matchService.startMatch(competenciaMatchId, refereeId));
     }
 
     @Test
     void startMatch_alreadyStarted_throwsInvalidMatchStateException() {
-        Match existing = new Match();
-        existing.setId(UUID.randomUUID());
-        existing.setRefereeId(refereeId);
-        existing.setStatus(MatchStatus.IN_PROGRESS);
-
-        when(competenciaClient.getScheduledMatch(competenciaMatchId)).thenReturn(new ScheduledMatchInfo(
-                competenciaMatchId, UUID.randomUUID(), UUID.randomUUID(), "Local", "Visitante",
-                Instant.now().minusSeconds(60), true));
-        when(matchRepository.findByCompetenciaMatchId(competenciaMatchId)).thenReturn(Optional.of(existing));
+        Match match = new Match();
+        match.setId(UUID.randomUUID());
+        match.setRefereeId(refereeId);
+        match.setStatus(MatchStatus.IN_PROGRESS);
+        when(matchRepository.findByCompetenciaMatchId(competenciaMatchId)).thenReturn(Optional.of(match));
 
         assertThrows(InvalidMatchStateException.class, () -> matchService.startMatch(competenciaMatchId, refereeId));
     }
@@ -271,36 +305,33 @@ class MatchServiceImplTest {
     }
 
     @Test
-    void listAssignedMatches_mapsStartedAndUnstartedScheduledMatches() {
-        UUID startedCompetenciaId = UUID.randomUUID();
-        UUID unstartedReadyId = UUID.randomUUID();
-        UUID unstartedNotReadyId = UUID.randomUUID();
-
-        Match startedMatch = new Match();
-        startedMatch.setId(UUID.randomUUID());
-        startedMatch.setCompetenciaMatchId(startedCompetenciaId);
-        startedMatch.setStatus(MatchStatus.IN_PROGRESS);
-
-        ScheduledMatchInfo started = new ScheduledMatchInfo(startedCompetenciaId, UUID.randomUUID(),
-                UUID.randomUUID(), "Local", "Visitante", Instant.now().minusSeconds(3600), true);
-        ScheduledMatchInfo unstartedReady = new ScheduledMatchInfo(unstartedReadyId, UUID.randomUUID(),
-                UUID.randomUUID(), "Local", "Visitante", Instant.now().minusSeconds(60), true);
-        ScheduledMatchInfo unstartedNotReady = new ScheduledMatchInfo(unstartedNotReadyId, UUID.randomUUID(),
-                UUID.randomUUID(), "Local", "Visitante", Instant.now().plusSeconds(3600), false);
-
-        when(competenciaClient.getAssignedMatches(refereeId))
-                .thenReturn(List.of(started, unstartedReady, unstartedNotReady));
-        when(matchRepository.findByCompetenciaMatchId(startedCompetenciaId)).thenReturn(Optional.of(startedMatch));
-        when(matchRepository.findByCompetenciaMatchId(unstartedReadyId)).thenReturn(Optional.empty());
-        when(matchRepository.findByCompetenciaMatchId(unstartedNotReadyId)).thenReturn(Optional.empty());
+    void listAssignedMatches_returnsSummariesFromLocalRepository() {
+        Match match = new Match();
+        match.setId(UUID.randomUUID());
+        match.setCompetenciaMatchId(competenciaMatchId);
+        match.setStatus(MatchStatus.SCHEDULED);
+        when(matchRepository.findByRefereeId(refereeId)).thenReturn(List.of(match));
 
         List<MatchSummaryResponse> summaries = matchService.listAssignedMatches(refereeId);
 
-        assertThat(summaries).hasSize(3);
-        assertThat(summaries.get(0).status()).isEqualTo(MatchStatus.IN_PROGRESS);
-        assertThat(summaries.get(1).status()).isEqualTo(MatchStatus.SCHEDULED);
-        assertThat(summaries.get(1).manageable()).isTrue();
-        assertThat(summaries.get(2).manageable()).isFalse();
+        assertThat(summaries).hasSize(1);
+        assertThat(summaries.get(0).status()).isEqualTo(MatchStatus.SCHEDULED);
+    }
+
+    private Match inProgressMatch(MatchPhase phase, int homeScore, int awayScore) {
+        Match match = new Match();
+        match.setId(UUID.randomUUID());
+        match.setCompetenciaMatchId(competenciaMatchId);
+        match.setTournamentId(UUID.randomUUID());
+        match.setPhase(phase);
+        match.setHomeTeamId(UUID.randomUUID());
+        match.setAwayTeamId(UUID.randomUUID());
+        match.setStatus(MatchStatus.IN_PROGRESS);
+        match.setPeriodStartedAt(Instant.now().minusSeconds(60));
+        match.setAccumulatedSeconds(0);
+        match.setHomeScore(homeScore);
+        match.setAwayScore(awayScore);
+        return match;
     }
 
     @Test
@@ -312,7 +343,7 @@ class MatchServiceImplTest {
         UUID matchId = match.getId();
         when(matchAccessService.requireOwnedMatch(matchId, refereeId)).thenReturn(match);
 
-        assertThrows(InvalidMatchStateException.class, () -> matchService.finishMatch(matchId, refereeId));
+        assertThrows(InvalidMatchStateException.class, () -> matchService.finishMatch(matchId, refereeId, null));
     }
 
     @Test
@@ -324,21 +355,159 @@ class MatchServiceImplTest {
         UUID matchId = match.getId();
         when(matchAccessService.requireOwnedMatch(matchId, refereeId)).thenReturn(match);
 
-        assertThrows(InvalidMatchStateException.class, () -> matchService.finishMatch(matchId, refereeId));
+        assertThrows(InvalidMatchStateException.class, () -> matchService.finishMatch(matchId, refereeId, null));
+
+        verify(matchFinishedEventPublisher, org.mockito.Mockito.never()).publish(any());
+    }
+
+    @Test
+    void finishMatch_gruposHigherHomeScore_ganadorIsHomeTeamAndNoEliminado() {
+        Match match = inProgressMatch(MatchPhase.GRUPOS, 2, 1);
+        when(matchAccessService.requireOwnedMatch(match.getId(), refereeId)).thenReturn(match);
+        when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        matchService.finishMatch(match.getId(), refereeId, null);
+
+        ArgumentCaptor<MatchFinishedEvent> captor = ArgumentCaptor.forClass(MatchFinishedEvent.class);
+        verify(matchFinishedEventPublisher).publish(captor.capture());
+        MatchFinishedEvent event = captor.getValue();
+        assertThat(event.matchId()).isEqualTo(competenciaMatchId);
+        assertThat(event.ganadorId()).isEqualTo(match.getHomeTeamId());
+        assertThat(event.eliminadoId()).isNull();
+        assertThat(event.golesA()).isEqualTo(2);
+        assertThat(event.golesB()).isEqualTo(1);
+    }
+
+    @Test
+    void finishMatch_gruposDraw_ganadorAndEliminadoAreNull() {
+        Match match = inProgressMatch(MatchPhase.GRUPOS, 1, 1);
+        when(matchAccessService.requireOwnedMatch(match.getId(), refereeId)).thenReturn(match);
+        when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        matchService.finishMatch(match.getId(), refereeId, null);
+
+        ArgumentCaptor<MatchFinishedEvent> captor = ArgumentCaptor.forClass(MatchFinishedEvent.class);
+        verify(matchFinishedEventPublisher).publish(captor.capture());
+        assertThat(captor.getValue().ganadorId()).isNull();
+        assertThat(captor.getValue().eliminadoId()).isNull();
+    }
+
+    @Test
+    void finishMatch_eliminatoriaNoDraw_ganadorAndEliminadoAreSet() {
+        Match match = inProgressMatch(MatchPhase.ELIMINATORIA, 3, 1);
+        when(matchAccessService.requireOwnedMatch(match.getId(), refereeId)).thenReturn(match);
+        when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        matchService.finishMatch(match.getId(), refereeId, null);
+
+        ArgumentCaptor<MatchFinishedEvent> captor = ArgumentCaptor.forClass(MatchFinishedEvent.class);
+        verify(matchFinishedEventPublisher).publish(captor.capture());
+        assertThat(captor.getValue().ganadorId()).isEqualTo(match.getHomeTeamId());
+        assertThat(captor.getValue().eliminadoId()).isEqualTo(match.getAwayTeamId());
+    }
+
+    @Test
+    void finishMatch_eliminatoriaDrawWithoutPenalties_throwsPenaltyShootoutRequiredException() {
+        Match match = inProgressMatch(MatchPhase.ELIMINATORIA, 2, 2);
+        when(matchAccessService.requireOwnedMatch(match.getId(), refereeId)).thenReturn(match);
+
+        assertThrows(PenaltyShootoutRequiredException.class,
+                () -> matchService.finishMatch(match.getId(), refereeId, null));
+
+        verify(matchFinishedEventPublisher, org.mockito.Mockito.never()).publish(any());
+    }
+
+    @Test
+    void finishMatch_eliminatoriaDrawWithPenalties_resolvesWinnerFromPenaltyGoals() {
+        Match match = inProgressMatch(MatchPhase.ELIMINATORIA, 1, 1);
+        when(matchAccessService.requireOwnedMatch(match.getId(), refereeId)).thenReturn(match);
+        when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        FinishMatchRequest request = new FinishMatchRequest(null, null, 5, 4);
+        matchService.finishMatch(match.getId(), refereeId, request);
+
+        ArgumentCaptor<MatchFinishedEvent> captor = ArgumentCaptor.forClass(MatchFinishedEvent.class);
+        verify(matchFinishedEventPublisher).publish(captor.capture());
+        assertThat(captor.getValue().ganadorId()).isEqualTo(match.getHomeTeamId());
+        assertThat(captor.getValue().eliminadoId()).isEqualTo(match.getAwayTeamId());
+        // El marcador reportado sigue siendo el del tiempo reglamentario, no el de penales.
+        assertThat(captor.getValue().golesA()).isEqualTo(1);
+        assertThat(captor.getValue().golesB()).isEqualTo(1);
+    }
+
+    @Test
+    void finishMatch_eliminatoriaDrawWithTiedPenalties_throwsInvalidMatchStateException() {
+        Match match = inProgressMatch(MatchPhase.ELIMINATORIA, 1, 1);
+        when(matchAccessService.requireOwnedMatch(match.getId(), refereeId)).thenReturn(match);
+
+        FinishMatchRequest request = new FinishMatchRequest(null, null, 4, 4);
+
+        assertThrows(InvalidMatchStateException.class,
+                () -> matchService.finishMatch(match.getId(), refereeId, request));
+    }
+
+    @Test
+    void finishMatch_walkoverInGrupos_nobodyScoresAndNoGanador() {
+        Match match = inProgressMatch(MatchPhase.GRUPOS, 0, 0);
+        when(matchAccessService.requireOwnedMatch(match.getId(), refereeId)).thenReturn(match);
+        when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        FinishMatchRequest request = new FinishMatchRequest(true, match.getAwayTeamId(), null, null);
+        matchService.finishMatch(match.getId(), refereeId, request);
+
+        ArgumentCaptor<MatchFinishedEvent> captor = ArgumentCaptor.forClass(MatchFinishedEvent.class);
+        verify(matchFinishedEventPublisher).publish(captor.capture());
+        assertThat(captor.getValue().ganadorId()).isNull();
+        assertThat(captor.getValue().eliminadoId()).isNull();
+        assertThat(captor.getValue().golesA()).isZero();
+        assertThat(captor.getValue().golesB()).isZero();
+    }
+
+    @Test
+    void finishMatch_walkoverInEliminatoria_presentTeamWinsAbsentTeamEliminated() {
+        Match match = inProgressMatch(MatchPhase.ELIMINATORIA, 0, 0);
+        when(matchAccessService.requireOwnedMatch(match.getId(), refereeId)).thenReturn(match);
+        when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        FinishMatchRequest request = new FinishMatchRequest(true, match.getHomeTeamId(), null, null);
+        matchService.finishMatch(match.getId(), refereeId, request);
+
+        ArgumentCaptor<MatchFinishedEvent> captor = ArgumentCaptor.forClass(MatchFinishedEvent.class);
+        verify(matchFinishedEventPublisher).publish(captor.capture());
+        assertThat(captor.getValue().ganadorId()).isEqualTo(match.getAwayTeamId());
+        assertThat(captor.getValue().eliminadoId()).isEqualTo(match.getHomeTeamId());
+    }
+
+    @Test
+    void finishMatch_walkoverWithoutAbsentTeam_throwsValidationException() {
+        Match match = inProgressMatch(MatchPhase.ELIMINATORIA, 0, 0);
+        when(matchAccessService.requireOwnedMatch(match.getId(), refereeId)).thenReturn(match);
+
+        FinishMatchRequest request = new FinishMatchRequest(true, null, null, null);
+
+        assertThrows(ValidationException.class, () -> matchService.finishMatch(match.getId(), refereeId, request));
+    }
+
+    @Test
+    void finishMatch_walkoverWithTeamNotInMatch_propagatesInvalidTeamException() {
+        Match match = inProgressMatch(MatchPhase.ELIMINATORIA, 0, 0);
+        when(matchAccessService.requireOwnedMatch(match.getId(), refereeId)).thenReturn(match);
+        UUID unrelatedTeamId = UUID.randomUUID();
+        doThrow(new InvalidTeamException(unrelatedTeamId, match.getId()))
+                .when(matchAccessService).validateTeamBelongsToMatch(match, unrelatedTeamId);
+
+        FinishMatchRequest request = new FinishMatchRequest(true, unrelatedTeamId, null, null);
+
+        assertThrows(InvalidTeamException.class, () -> matchService.finishMatch(match.getId(), refereeId, request));
     }
 
     @Test
     void finishMatch_fromInProgress_marksFinishedAndReportsAudit() {
-        Match match = new Match();
-        match.setId(UUID.randomUUID());
-        match.setStatus(MatchStatus.IN_PROGRESS);
-        match.setPeriodStartedAt(Instant.now().minusSeconds(60));
-        match.setAccumulatedSeconds(0);
-
+        Match match = inProgressMatch(MatchPhase.GRUPOS, 0, 0);
         when(matchAccessService.requireOwnedMatch(match.getId(), refereeId)).thenReturn(match);
         when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        MatchResponse response = matchService.finishMatch(match.getId(), refereeId);
+        MatchResponse response = matchService.finishMatch(match.getId(), refereeId, null);
 
         assertThat(response.status()).isEqualTo(MatchStatus.FINISHED);
         assertThat(match.getEndedAt()).isNotNull();

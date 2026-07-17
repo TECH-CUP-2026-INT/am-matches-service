@@ -8,12 +8,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import co.edu.escuelaing.techcup.match.config.InternalApiKeyProperties;
 import co.edu.escuelaing.techcup.match.config.RefereeSecurityProperties;
 import co.edu.escuelaing.techcup.match.config.SecurityConfig;
 import co.edu.escuelaing.techcup.match.dto.response.GoalResponse;
 import co.edu.escuelaing.techcup.match.entity.enums.EventType;
 import co.edu.escuelaing.techcup.match.entity.enums.MatchPeriod;
 import co.edu.escuelaing.techcup.match.security.CurrentRefereeProvider;
+import co.edu.escuelaing.techcup.match.security.InternalApiKeyFilter;
 import co.edu.escuelaing.techcup.match.security.JwtClaimsFilter;
 import co.edu.escuelaing.techcup.match.security.RefereeGuard;
 import co.edu.escuelaing.techcup.match.service.GoalService;
@@ -32,8 +34,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(controllers = GoalController.class)
-@Import({SecurityConfig.class, RefereeGuard.class, JwtClaimsFilter.class, CurrentRefereeProvider.class})
-@EnableConfigurationProperties(RefereeSecurityProperties.class)
+@Import({SecurityConfig.class, RefereeGuard.class, JwtClaimsFilter.class, InternalApiKeyFilter.class, CurrentRefereeProvider.class})
+@EnableConfigurationProperties({RefereeSecurityProperties.class, InternalApiKeyProperties.class})
 @TestPropertySource(properties = {
         "techcup.security.role-claim=roles",
         "techcup.security.referee-role=ARBITRO"

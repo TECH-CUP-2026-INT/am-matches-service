@@ -1,7 +1,6 @@
 package co.edu.escuelaing.techcup.match.exception;
 
 import co.edu.escuelaing.techcup.match.dto.response.ErrorResponse;
-import co.edu.escuelaing.techcup.match.integration.competencia.CompetenciaIntegrationException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ValidationException;
 import java.time.Instant;
@@ -31,7 +30,8 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.FORBIDDEN, ex.getMessage(), request);
     }
 
-    @ExceptionHandler({InvalidMatchStateException.class, MatchNotReadyException.class, MatchSheetAlreadyExistsException.class})
+    @ExceptionHandler({InvalidMatchStateException.class, MatchNotReadyException.class,
+            MatchSheetAlreadyExistsException.class, PenaltyShootoutRequiredException.class})
     public ResponseEntity<ErrorResponse> handleConflict(RuntimeException ex, HttpServletRequest request) {
         return build(HttpStatus.CONFLICT, ex.getMessage(), request);
     }
@@ -39,12 +39,6 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidTeamException.class)
     public ResponseEntity<ErrorResponse> handleInvalidTeam(InvalidTeamException ex, HttpServletRequest request) {
         return build(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
-    }
-
-    @ExceptionHandler(CompetenciaIntegrationException.class)
-    public ResponseEntity<ErrorResponse> handleCompetenciaDown(CompetenciaIntegrationException ex, HttpServletRequest request) {
-        log.warn("Fallo de integración con el Servicio de Competencia: {}", ex.getMessage());
-        return build(HttpStatus.BAD_GATEWAY, ex.getMessage(), request);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

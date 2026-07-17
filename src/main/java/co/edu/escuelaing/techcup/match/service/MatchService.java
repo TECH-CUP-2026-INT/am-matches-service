@@ -1,11 +1,15 @@
 package co.edu.escuelaing.techcup.match.service;
 
+import co.edu.escuelaing.techcup.match.dto.request.FinishMatchRequest;
+import co.edu.escuelaing.techcup.match.dto.request.MatchDefinitionRequest;
 import co.edu.escuelaing.techcup.match.dto.response.MatchResponse;
 import co.edu.escuelaing.techcup.match.dto.response.MatchSummaryResponse;
 import java.util.List;
 import java.util.UUID;
 
 public interface MatchService {
+
+    MatchResponse receiveMatchDefinition(MatchDefinitionRequest request);
 
     List<MatchSummaryResponse> listAssignedMatches(UUID refereeId);
 
@@ -21,5 +25,5 @@ public interface MatchService {
 
     MatchResponse addInjuryTime(UUID matchId, UUID refereeId, int minutes);
 
-    MatchResponse finishMatch(UUID matchId, UUID refereeId);
+    MatchResponse finishMatch(UUID matchId, UUID refereeId, FinishMatchRequest request);
 }

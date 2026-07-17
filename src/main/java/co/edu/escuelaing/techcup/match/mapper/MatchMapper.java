@@ -5,7 +5,6 @@ import co.edu.escuelaing.techcup.match.dto.response.MatchSummaryResponse;
 import co.edu.escuelaing.techcup.match.entity.Match;
 import co.edu.escuelaing.techcup.match.entity.enums.EventType;
 import co.edu.escuelaing.techcup.match.entity.enums.MatchStatus;
-import co.edu.escuelaing.techcup.match.integration.competencia.ScheduledMatchInfo;
 
 public final class MatchMapper {
 
@@ -16,6 +15,8 @@ public final class MatchMapper {
         return new MatchResponse(
                 match.getId(),
                 match.getCompetenciaMatchId(),
+                match.getTournamentId(),
+                match.getPhase(),
                 match.getHomeTeamId(),
                 match.getAwayTeamId(),
                 match.getHomeTeamName(),
@@ -48,16 +49,4 @@ public final class MatchMapper {
         );
     }
 
-    public static MatchSummaryResponse toUnstartedSummary(ScheduledMatchInfo scheduled, boolean manageable) {
-        return new MatchSummaryResponse(
-                null,
-                scheduled.competenciaMatchId(),
-                scheduled.homeTeamName(),
-                scheduled.awayTeamName(),
-                MatchStatus.SCHEDULED,
-                manageable,
-                0,
-                0
-        );
-    }
 }

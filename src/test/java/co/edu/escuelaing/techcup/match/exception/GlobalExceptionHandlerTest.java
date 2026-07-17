@@ -5,7 +5,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import co.edu.escuelaing.techcup.match.dto.response.ErrorResponse;
-import co.edu.escuelaing.techcup.match.integration.competencia.CompetenciaIntegrationException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ValidationException;
 import java.util.List;
@@ -73,19 +72,19 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void handleConflict_returns409ForPenaltyShootoutRequired() {
+        ResponseEntity<ErrorResponse> response = handler.handleConflict(
+                new PenaltyShootoutRequiredException("se requieren penales"), request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
     void handleInvalidTeam_returns400() {
         ResponseEntity<ErrorResponse> response = handler.handleInvalidTeam(
                 new InvalidTeamException(UUID.randomUUID(), UUID.randomUUID()), request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-    }
-
-    @Test
-    void handleCompetenciaDown_returns502() {
-        ResponseEntity<ErrorResponse> response = handler.handleCompetenciaDown(
-                new CompetenciaIntegrationException("no disponible", new RuntimeException()), request);
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
     }
 
     @Test

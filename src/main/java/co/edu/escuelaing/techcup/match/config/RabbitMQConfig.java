@@ -11,11 +11,11 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * Conectividad al exchange compartido de RabbitMQ ({@code techcup.exchange}, topic;
- * mismo broker que ya usan Torneos y Estadísticas — ver docs/rabbitmq-integration.md del
- * Servicio de Estadísticas). Este servicio (Partidos / "Competencia" en esa doc) todavía
- * no publica nada: {@code techcup.match.event.stat} requiere datos por jugador que hoy no
- * se trackean acá (faltas, minutos jugados, asistencias, arquero, tournamentId). Este
- * config solo deja lista la conexión para cuando esos datos existan.
+ * mismo broker que ya usan Tournament y Estadísticas — ver docs/rabbitmq-integration.md del
+ * Servicio de Estadísticas). Este servicio publica dos routing keys al finalizar un
+ * partido: {@code techcup.match.event.stat} (por jugador, hacia Estadísticas — ver
+ * MatchFinishedStatPublisher) y {@code techcup.match.finished} (resultado del partido,
+ * hacia Tournament — ver RabbitMatchFinishedEventPublisher).
  *
  * <p>{@code ignoreDeclarationExceptions(true)} en el RabbitAdmin: por defecto Spring AMQP
  * declara el exchange contra el broker real al arrancar la aplicación, y si esa

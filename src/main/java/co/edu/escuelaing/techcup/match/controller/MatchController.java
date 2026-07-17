@@ -1,6 +1,7 @@
 package co.edu.escuelaing.techcup.match.controller;
 
 import co.edu.escuelaing.techcup.match.dto.request.AddInjuryTimeRequest;
+import co.edu.escuelaing.techcup.match.dto.request.FinishMatchRequest;
 import co.edu.escuelaing.techcup.match.dto.response.MatchResponse;
 import co.edu.escuelaing.techcup.match.dto.response.MatchSummaryResponse;
 import co.edu.escuelaing.techcup.match.security.CurrentRefereeProvider;
@@ -68,7 +69,8 @@ public class MatchController {
     }
 
     @PostMapping("/{matchId}/finalizar")
-    public MatchResponse finishMatch(@PathVariable UUID matchId) {
-        return matchService.finishMatch(matchId, currentRefereeProvider.getCurrentRefereeId());
+    public MatchResponse finishMatch(@PathVariable UUID matchId,
+                                      @Valid @RequestBody(required = false) FinishMatchRequest request) {
+        return matchService.finishMatch(matchId, currentRefereeProvider.getCurrentRefereeId(), request);
     }
 }

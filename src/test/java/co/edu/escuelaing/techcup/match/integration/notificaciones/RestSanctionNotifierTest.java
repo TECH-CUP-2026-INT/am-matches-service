@@ -41,10 +41,8 @@ class RestSanctionNotifierTest {
         when(builder.build()).thenReturn(restClient);
 
         IntegrationServicesProperties properties = new IntegrationServicesProperties(
-                new IntegrationServicesProperties.ServiceEndpoint("http://localhost:8081"),
                 new IntegrationServicesProperties.ServiceEndpoint("http://localhost:8082"),
-                new IntegrationServicesProperties.ServiceEndpoint("http://localhost:8083"),
-                new IntegrationServicesProperties.ServiceEndpoint("http://localhost:8090"));
+                new IntegrationServicesProperties.ServiceEndpoint("http://localhost:8083"));
 
         notifier = new RestSanctionNotifier(builder, properties, new InternalApiKeyProperties("secret-key"));
 

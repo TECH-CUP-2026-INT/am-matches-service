@@ -9,14 +9,17 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import co.edu.escuelaing.techcup.match.config.InternalApiKeyProperties;
 import co.edu.escuelaing.techcup.match.config.RefereeSecurityProperties;
 import co.edu.escuelaing.techcup.match.config.SecurityConfig;
 import co.edu.escuelaing.techcup.match.dto.response.MatchResponse;
 import co.edu.escuelaing.techcup.match.dto.response.MatchSummaryResponse;
 import co.edu.escuelaing.techcup.match.entity.enums.EventType;
 import co.edu.escuelaing.techcup.match.entity.enums.MatchPeriod;
+import co.edu.escuelaing.techcup.match.entity.enums.MatchPhase;
 import co.edu.escuelaing.techcup.match.entity.enums.MatchStatus;
 import co.edu.escuelaing.techcup.match.security.CurrentRefereeProvider;
+import co.edu.escuelaing.techcup.match.security.InternalApiKeyFilter;
 import co.edu.escuelaing.techcup.match.security.JwtClaimsFilter;
 import co.edu.escuelaing.techcup.match.security.RefereeGuard;
 import co.edu.escuelaing.techcup.match.service.MatchService;
@@ -35,8 +38,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(controllers = MatchController.class)
-@Import({SecurityConfig.class, RefereeGuard.class, JwtClaimsFilter.class, CurrentRefereeProvider.class})
-@EnableConfigurationProperties(RefereeSecurityProperties.class)
+@Import({SecurityConfig.class, RefereeGuard.class, JwtClaimsFilter.class, InternalApiKeyFilter.class,
+        CurrentRefereeProvider.class})
+@EnableConfigurationProperties({RefereeSecurityProperties.class, InternalApiKeyProperties.class})
 @TestPropertySource(properties = {
         "techcup.security.role-claim=roles",
         "techcup.security.referee-role=ARBITRO"
@@ -60,7 +64,8 @@ class MatchControllerTest {
     }
 
     private MatchResponse sampleResponse(MatchStatus status, MatchPeriod period) {
-        return new MatchResponse(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+        return new MatchResponse(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), MatchPhase.GRUPOS,
+                UUID.randomUUID(), UUID.randomUUID(),
                 "Local", "Visitante", UUID.randomUUID(), status, period, 0, 0, 0, 0, 10,
                 Instant.now(), null, EventType.MATCH_STARTED);
     }
@@ -144,7 +149,8 @@ class MatchControllerTest {
     @Test
     void finishMatch_returns200() throws Exception {
         UUID matchId = UUID.randomUUID();
-        when(matchService.finishMatch(eq(matchId), any())).thenReturn(sampleResponse(MatchStatus.FINISHED, MatchPeriod.SECOND_HALF));
+        when(matchService.finishMatch(eq(matchId), any(), any()))
+                .thenReturn(sampleResponse(MatchStatus.FINISHED, MatchPeriod.SECOND_HALF));
 
         mockMvc.perform(post("/api/partidos/{matchId}/finalizar", matchId).header("Authorization", "Bearer " + refereeToken()))
                 .andExpect(status().isOk())

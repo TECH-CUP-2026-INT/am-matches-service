@@ -1,23 +1,30 @@
 package co.edu.escuelaing.techcup.match.service;
 
+import co.edu.escuelaing.techcup.match.dto.request.FinishMatchRequest;
+import co.edu.escuelaing.techcup.match.dto.request.MatchDefinitionRequest;
 import co.edu.escuelaing.techcup.match.dto.response.MatchResponse;
 import co.edu.escuelaing.techcup.match.dto.response.MatchSummaryResponse;
 import co.edu.escuelaing.techcup.match.entity.Match;
 import co.edu.escuelaing.techcup.match.entity.enums.EventType;
 import co.edu.escuelaing.techcup.match.entity.enums.MatchPeriod;
+import co.edu.escuelaing.techcup.match.entity.enums.MatchPhase;
 import co.edu.escuelaing.techcup.match.entity.enums.MatchStatus;
 import co.edu.escuelaing.techcup.match.exception.InvalidMatchStateException;
 import co.edu.escuelaing.techcup.match.exception.MatchAccessDeniedException;
+import co.edu.escuelaing.techcup.match.exception.MatchNotFoundException;
 import co.edu.escuelaing.techcup.match.exception.MatchNotReadyException;
+import co.edu.escuelaing.techcup.match.exception.PenaltyShootoutRequiredException;
 import co.edu.escuelaing.techcup.match.integration.auditoria.AuditReporter;
 import co.edu.escuelaing.techcup.match.integration.auditoria.MatchAuditEvent;
-import co.edu.escuelaing.techcup.match.integration.competencia.CompetenciaClient;
-import co.edu.escuelaing.techcup.match.integration.competencia.ScheduledMatchInfo;
 import co.edu.escuelaing.techcup.match.mapper.MatchMapper;
+import co.edu.escuelaing.techcup.match.messaging.MatchFinishedEvent;
+import co.edu.escuelaing.techcup.match.messaging.MatchFinishedEventPublisher;
 import co.edu.escuelaing.techcup.match.messaging.MatchFinishedStatPublisher;
 import co.edu.escuelaing.techcup.match.repository.MatchRepository;
+import jakarta.validation.ValidationException;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -29,29 +36,56 @@ public class MatchServiceImpl implements MatchService {
 
     private final MatchRepository matchRepository;
     private final MatchAccessService matchAccessService;
-    private final CompetenciaClient competenciaClient;
     private final AuditReporter auditReporter;
     private final MatchFinishedStatPublisher matchFinishedStatPublisher;
+    private final MatchFinishedEventPublisher matchFinishedEventPublisher;
 
     public MatchServiceImpl(MatchRepository matchRepository,
                              MatchAccessService matchAccessService,
-                             CompetenciaClient competenciaClient,
                              AuditReporter auditReporter,
-                             MatchFinishedStatPublisher matchFinishedStatPublisher) {
+                             MatchFinishedStatPublisher matchFinishedStatPublisher,
+                             MatchFinishedEventPublisher matchFinishedEventPublisher) {
         this.matchRepository = matchRepository;
         this.matchAccessService = matchAccessService;
-        this.competenciaClient = competenciaClient;
         this.auditReporter = auditReporter;
         this.matchFinishedStatPublisher = matchFinishedStatPublisher;
+        this.matchFinishedEventPublisher = matchFinishedEventPublisher;
+    }
+
+    @Override
+    public MatchResponse receiveMatchDefinition(MatchDefinitionRequest request) {
+        Optional<Match> existing = matchRepository.findByCompetenciaMatchId(request.matchId());
+        if (existing.isPresent()) {
+            // Idempotencia: Tournament puede reintentar la entrega del mismo mensaje
+            // (p. ej. redelivery); no se sobrescribe un partido ya recibido.
+            Match match = existing.get();
+            return MatchMapper.toResponse(match, MatchClock.currentMinute(match), null);
+        }
+
+        Instant now = Instant.now();
+        Match match = new Match();
+        match.setCompetenciaMatchId(request.matchId());
+        match.setTournamentId(request.tournamentId());
+        match.setPhase(request.fase());
+        match.setHomeTeamId(request.equipoAId());
+        match.setAwayTeamId(request.equipoBId());
+        match.setHomeTeamName(request.equipoANombre());
+        match.setAwayTeamName(request.equipoBNombre());
+        match.setRefereeId(request.arbitroId());
+        match.setCourtId(request.canchaId());
+        match.setScheduledKickoff(request.fecha().atTime(request.hora()).toInstant(ZoneOffset.UTC));
+        match.setStatus(MatchStatus.SCHEDULED);
+        match.setCreatedAt(now);
+        match.setUpdatedAt(now);
+
+        match = matchRepository.save(match);
+        return MatchMapper.toResponse(match, MatchClock.currentMinute(match), null);
     }
 
     @Override
     public List<MatchSummaryResponse> listAssignedMatches(UUID refereeId) {
-        List<ScheduledMatchInfo> assigned = competenciaClient.getAssignedMatches(refereeId);
-        return assigned.stream()
-                .map(scheduled -> matchRepository.findByCompetenciaMatchId(scheduled.competenciaMatchId())
-                        .map(MatchMapper::toSummary)
-                        .orElseGet(() -> MatchMapper.toUnstartedSummary(scheduled, isReadyToStart(scheduled))))
+        return matchRepository.findByRefereeId(refereeId).stream()
+                .map(MatchMapper::toSummary)
                 .toList();
     }
 
@@ -63,42 +97,20 @@ public class MatchServiceImpl implements MatchService {
 
     @Override
     public MatchResponse startMatch(UUID competenciaMatchId, UUID refereeId) {
-        ScheduledMatchInfo scheduled = competenciaClient.getScheduledMatch(competenciaMatchId);
+        Match match = matchRepository.findByCompetenciaMatchId(competenciaMatchId)
+                .orElseThrow(() -> new MatchNotFoundException(competenciaMatchId));
 
-        if (!scheduled.lineupConfirmed()) {
-            throw new MatchNotReadyException("La alineación del partido aún no ha sido confirmada por Competencia");
+        if (!match.getRefereeId().equals(refereeId)) {
+            throw new MatchAccessDeniedException(competenciaMatchId);
         }
-        if (Instant.now().isBefore(scheduled.scheduledKickoff())) {
+        if (match.getStatus() != MatchStatus.SCHEDULED) {
+            throw new InvalidMatchStateException("El partido ya fue iniciado o finalizado previamente");
+        }
+        if (Instant.now().isBefore(match.getScheduledKickoff())) {
             throw new MatchNotReadyException("El partido aún no ha llegado a su hora programada de inicio");
         }
 
-        // Nota: con Mongo el id de Match se genera en el constructor (inicializador de
-        // campo), por lo que ya no sirve "match.getId() != null" para distinguir un
-        // partido existente de uno nuevo (siempre tendría id). Se usa el Optional
-        // devuelto por el repositorio para esa decisión.
-        Optional<Match> existingMatch = matchRepository.findByCompetenciaMatchId(competenciaMatchId);
-        Match match;
         Instant now = Instant.now();
-
-        if (existingMatch.isPresent()) {
-            match = existingMatch.get();
-            if (!match.getRefereeId().equals(refereeId)) {
-                throw new MatchAccessDeniedException(competenciaMatchId);
-            }
-            if (match.getStatus() != MatchStatus.SCHEDULED) {
-                throw new InvalidMatchStateException("El partido ya fue iniciado o finalizado previamente");
-            }
-        } else {
-            match = new Match();
-            match.setCompetenciaMatchId(scheduled.competenciaMatchId());
-            match.setHomeTeamId(scheduled.homeTeamId());
-            match.setAwayTeamId(scheduled.awayTeamId());
-            match.setHomeTeamName(scheduled.homeTeamName());
-            match.setAwayTeamName(scheduled.awayTeamName());
-            match.setRefereeId(refereeId);
-            match.setCreatedAt(now);
-        }
-
         match.setStatus(MatchStatus.IN_PROGRESS);
         match.setCurrentPeriod(MatchPeriod.FIRST_HALF);
         match.setStartedAt(now);
@@ -181,7 +193,7 @@ public class MatchServiceImpl implements MatchService {
     }
 
     @Override
-    public MatchResponse finishMatch(UUID matchId, UUID refereeId) {
+    public MatchResponse finishMatch(UUID matchId, UUID refereeId, FinishMatchRequest request) {
         Match match = matchAccessService.requireOwnedMatch(matchId, refereeId);
         if (match.getStatus() == MatchStatus.FINISHED) {
             throw new InvalidMatchStateException("El partido ya fue finalizado");
@@ -195,7 +207,12 @@ public class MatchServiceImpl implements MatchService {
             match.setAccumulatedSeconds(match.getAccumulatedSeconds()
                     + Duration.between(match.getPeriodStartedAt(), now).getSeconds());
         }
+
+        MatchOutcome outcome = resolveOutcome(match, request);
+
         match.setStatus(MatchStatus.FINISHED);
+        match.setHomeScore(outcome.golesA());
+        match.setAwayScore(outcome.golesB());
         match.setEndedAt(now);
         match.setPeriodStartedAt(null);
         match.setUpdatedAt(now);
@@ -203,11 +220,72 @@ public class MatchServiceImpl implements MatchService {
 
         auditReporter.report(new MatchAuditEvent(match.getId(), EventType.MATCH_FINISHED, refereeId, now, Map.of()));
         matchFinishedStatPublisher.publishStatsFor(match);
+        matchFinishedEventPublisher.publish(new MatchFinishedEvent(
+                match.getCompetenciaMatchId(), match.getTournamentId(), match.getPhase(),
+                outcome.golesA(), outcome.golesB(), outcome.ganadorId(), outcome.eliminadoId(), now));
 
         return MatchMapper.toResponse(match, MatchClock.currentMinute(match), EventType.MATCH_FINISHED);
     }
 
-    private boolean isReadyToStart(ScheduledMatchInfo scheduled) {
-        return scheduled.lineupConfirmed() && !Instant.now().isBefore(scheduled.scheduledKickoff());
+    /**
+     * Fija golesA/golesB/ganadorId/eliminadoId según fase y walkover, consultando penales
+     * solo cuando eliminatoria termina empatada. GRUPOS admite empate (ganadorId null,
+     * nunca hay eliminadoId); ELIMINATORIA siempre exige un ganador.
+     */
+    private MatchOutcome resolveOutcome(Match match, FinishMatchRequest request) {
+        boolean walkover = request != null && Boolean.TRUE.equals(request.walkover());
+
+        if (walkover) {
+            UUID absentTeamId = request.equipoAusenteId();
+            if (absentTeamId == null) {
+                throw new ValidationException("Debe indicar el equipo ausente (equipoAusenteId) para declarar walkover");
+            }
+            matchAccessService.validateTeamBelongsToMatch(match, absentTeamId);
+
+            if (match.getPhase() == MatchPhase.ELIMINATORIA) {
+                UUID presentTeamId = absentTeamId.equals(match.getHomeTeamId())
+                        ? match.getAwayTeamId() : match.getHomeTeamId();
+                return new MatchOutcome(0, 0, presentTeamId, absentTeamId);
+            }
+            // GRUPOS: walkover se marca FINISHED, pero nadie suma.
+            return new MatchOutcome(0, 0, null, null);
+        }
+
+        int golesA = match.getHomeScore();
+        int golesB = match.getAwayScore();
+
+        if (match.getPhase() == MatchPhase.GRUPOS) {
+            if (golesA > golesB) {
+                return new MatchOutcome(golesA, golesB, match.getHomeTeamId(), null);
+            }
+            if (golesB > golesA) {
+                return new MatchOutcome(golesA, golesB, match.getAwayTeamId(), null);
+            }
+            return new MatchOutcome(golesA, golesB, null, null);
+        }
+
+        // ELIMINATORIA: no se permite empate.
+        if (golesA > golesB) {
+            return new MatchOutcome(golesA, golesB, match.getHomeTeamId(), match.getAwayTeamId());
+        }
+        if (golesB > golesA) {
+            return new MatchOutcome(golesA, golesB, match.getAwayTeamId(), match.getHomeTeamId());
+        }
+
+        if (request == null || request.golesPenalesA() == null || request.golesPenalesB() == null) {
+            throw new PenaltyShootoutRequiredException(
+                    "Partido de eliminatoria empatado: se requiere el resultado de los penales para definir el ganador");
+        }
+        int penalesA = request.golesPenalesA();
+        int penalesB = request.golesPenalesB();
+        if (penalesA == penalesB) {
+            throw new InvalidMatchStateException("Los goles de penales no pueden terminar en empate");
+        }
+        return penalesA > penalesB
+                ? new MatchOutcome(golesA, golesB, match.getHomeTeamId(), match.getAwayTeamId())
+                : new MatchOutcome(golesA, golesB, match.getAwayTeamId(), match.getHomeTeamId());
+    }
+
+    private record MatchOutcome(int golesA, int golesB, UUID ganadorId, UUID eliminadoId) {
     }
 }

@@ -43,9 +43,11 @@ techcup:
     role-claim: roles
     referee-role: ARBITRO
     internal:
-      # Debe coincidir con techcup.security.internal.api-key del servicio de
-      # notificaciones (INTERNAL_API_KEY), para autenticar las llamadas
-      # servicio-a-servicio vía InternalApiKeyFilter.
+      # Doble uso: (1) saliente — debe coincidir con techcup.security.internal.api-key
+      # del servicio de notificaciones (INTERNAL_API_KEY), para autenticar nuestras
+      # llamadas hacia allá; (2) entrante — el mismo valor que Tournament debe enviar
+      # en el header X-Internal-Api-Key al llamar POST /api/partidos (ver
+      # InternalApiKeyFilter).
       api-key: ${INTERNAL_API_KEY:local-dev-internal-key}
 
   sanciones:
@@ -55,16 +57,10 @@ techcup:
     match-sheets-dir: ${MATCH_SHEETS_DIR:./storage/match-sheets}
 
   servicios:
-    competencia:
-      base-url: ${COMPETENCIA_SERVICE_URL:http://localhost:8081}
     estadisticas:
       base-url: ${ESTADISTICAS_SERVICE_URL:http://localhost:8082}
     notificaciones:
       base-url: ${NOTIFICACIONES_SERVICE_URL:http://localhost:8083}
-    torneos:
-      # Para resolver el tournamentId de un partido antes de publicar
-      # techcup.match.event.stat — ver TournamentClient.
-      base-url: ${TORNEOS_SERVICE_URL:http://localhost:8090}
 
 management:
   endpoints:

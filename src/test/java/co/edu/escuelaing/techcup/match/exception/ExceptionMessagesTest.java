@@ -2,7 +2,6 @@ package co.edu.escuelaing.techcup.match.exception;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import co.edu.escuelaing.techcup.match.integration.competencia.CompetenciaIntegrationException;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -50,10 +49,8 @@ class ExceptionMessagesTest {
     }
 
     @Test
-    void competenciaIntegrationException_keepsMessageAndCause() {
-        Throwable cause = new RuntimeException("boom");
-        CompetenciaIntegrationException ex = new CompetenciaIntegrationException("fallo integración", cause);
-        assertThat(ex.getMessage()).isEqualTo("fallo integración");
-        assertThat(ex.getCause()).isSameAs(cause);
+    void penaltyShootoutRequiredException_keepsMessage() {
+        PenaltyShootoutRequiredException ex = new PenaltyShootoutRequiredException("se requieren penales");
+        assertThat(ex.getMessage()).isEqualTo("se requieren penales");
     }
 }

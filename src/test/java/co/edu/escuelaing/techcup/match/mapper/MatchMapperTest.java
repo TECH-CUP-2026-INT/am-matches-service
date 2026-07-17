@@ -7,8 +7,8 @@ import co.edu.escuelaing.techcup.match.dto.response.MatchSummaryResponse;
 import co.edu.escuelaing.techcup.match.entity.Match;
 import co.edu.escuelaing.techcup.match.entity.enums.EventType;
 import co.edu.escuelaing.techcup.match.entity.enums.MatchPeriod;
+import co.edu.escuelaing.techcup.match.entity.enums.MatchPhase;
 import co.edu.escuelaing.techcup.match.entity.enums.MatchStatus;
-import co.edu.escuelaing.techcup.match.integration.competencia.ScheduledMatchInfo;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -19,6 +19,8 @@ class MatchMapperTest {
         Match match = new Match();
         match.setId(UUID.randomUUID());
         match.setCompetenciaMatchId(UUID.randomUUID());
+        match.setTournamentId(UUID.randomUUID());
+        match.setPhase(MatchPhase.GRUPOS);
         match.setHomeTeamId(UUID.randomUUID());
         match.setAwayTeamId(UUID.randomUUID());
         match.setHomeTeamName("Home FC");
@@ -42,6 +44,8 @@ class MatchMapperTest {
 
         assertThat(response.id()).isEqualTo(match.getId());
         assertThat(response.competenciaMatchId()).isEqualTo(match.getCompetenciaMatchId());
+        assertThat(response.tournamentId()).isEqualTo(match.getTournamentId());
+        assertThat(response.phase()).isEqualTo(MatchPhase.GRUPOS);
         assertThat(response.homeTeamId()).isEqualTo(match.getHomeTeamId());
         assertThat(response.awayTeamId()).isEqualTo(match.getAwayTeamId());
         assertThat(response.homeTeamName()).isEqualTo("Home FC");
@@ -102,32 +106,4 @@ class MatchMapperTest {
         assertThat(summary.manageable()).isFalse();
     }
 
-    @Test
-    void toUnstartedSummary_mapsScheduledMatchInfo() {
-        ScheduledMatchInfo scheduled = new ScheduledMatchInfo(
-                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "Home", "Away",
-                Instant.now(), true);
-
-        MatchSummaryResponse summary = MatchMapper.toUnstartedSummary(scheduled, true);
-
-        assertThat(summary.id()).isNull();
-        assertThat(summary.competenciaMatchId()).isEqualTo(scheduled.competenciaMatchId());
-        assertThat(summary.homeTeamName()).isEqualTo("Home");
-        assertThat(summary.awayTeamName()).isEqualTo("Away");
-        assertThat(summary.status()).isEqualTo(MatchStatus.SCHEDULED);
-        assertThat(summary.manageable()).isTrue();
-        assertThat(summary.homeScore()).isZero();
-        assertThat(summary.awayScore()).isZero();
-    }
-
-    @Test
-    void toUnstartedSummary_notManageable() {
-        ScheduledMatchInfo scheduled = new ScheduledMatchInfo(
-                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "Home", "Away",
-                Instant.now(), false);
-
-        MatchSummaryResponse summary = MatchMapper.toUnstartedSummary(scheduled, false);
-
-        assertThat(summary.manageable()).isFalse();
-    }
 }

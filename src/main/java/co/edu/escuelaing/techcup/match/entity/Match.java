@@ -1,6 +1,7 @@
 package co.edu.escuelaing.techcup.match.entity;
 
 import co.edu.escuelaing.techcup.match.entity.enums.MatchPeriod;
+import co.edu.escuelaing.techcup.match.entity.enums.MatchPhase;
 import co.edu.escuelaing.techcup.match.entity.enums.MatchStatus;
 import java.time.Instant;
 import java.util.UUID;
@@ -20,8 +21,18 @@ public class Match {
     @Id
     private UUID id = UUID.randomUUID();
 
+    /** Id del partido tal como lo asigna Tournament (dueño de la definición del partido). */
     @Indexed(unique = true)
     private UUID competenciaMatchId;
+
+    private UUID tournamentId;
+
+    private MatchPhase phase;
+
+    private UUID courtId;
+
+    /** Fecha/hora programada de kickoff, recibida de Tournament; habilita "iniciar partido". */
+    private Instant scheduledKickoff;
 
     private UUID homeTeamId;
 
