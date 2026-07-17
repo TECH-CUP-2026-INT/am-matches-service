@@ -447,7 +447,7 @@ class MatchServiceImplTest {
     }
 
     @Test
-    void finishMatch_walkoverInGrupos_nobodyScoresAndNoGanador() {
+    void finishMatch_walkoverInGrupos_presentTeamWinsAndNoOneIsEliminated() {
         Match match = inProgressMatch(MatchPhase.GRUPOS, 0, 0);
         when(matchAccessService.requireOwnedMatch(match.getId(), refereeId)).thenReturn(match);
         when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -457,10 +457,12 @@ class MatchServiceImplTest {
 
         ArgumentCaptor<MatchFinishedEvent> captor = ArgumentCaptor.forClass(MatchFinishedEvent.class);
         verify(matchFinishedEventPublisher).publish(captor.capture());
-        assertThat(captor.getValue().ganadorId()).isNull();
+        assertThat(captor.getValue().ganadorId()).isEqualTo(match.getHomeTeamId());
         assertThat(captor.getValue().eliminadoId()).isNull();
+        assertThat(captor.getValue().ausenteId()).isEqualTo(match.getAwayTeamId());
         assertThat(captor.getValue().golesA()).isZero();
         assertThat(captor.getValue().golesB()).isZero();
+        assertThat(match.getAbsentTeamId()).isEqualTo(match.getAwayTeamId());
     }
 
     @Test
@@ -476,6 +478,7 @@ class MatchServiceImplTest {
         verify(matchFinishedEventPublisher).publish(captor.capture());
         assertThat(captor.getValue().ganadorId()).isEqualTo(match.getAwayTeamId());
         assertThat(captor.getValue().eliminadoId()).isEqualTo(match.getHomeTeamId());
+        assertThat(captor.getValue().ausenteId()).isEqualTo(match.getHomeTeamId());
     }
 
     @Test
