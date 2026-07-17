@@ -1,34 +1,70 @@
-# Servicio de Partidos (service-match) — TechCup Fútbol
+# 1. Nombre del servicio
 
-[![CI](https://github.com/TECH-CUP-2026-INT/am-matches-service/actions/workflows/ci.yml/badge.svg)](https://github.com/TECH-CUP-2026-INT/am-matches-service/actions/workflows/ci.yml)
-[![Docs](https://img.shields.io/badge/docs-mkdocs-6a1b9a)](https://tech-cup-2026-int.github.io/am-matches-service/)
+**Servicio de Partidos (service-match) — TechCup Fútbol** (`am-matches-service`)
 
-Microservicio responsable del **arbitraje en tiempo real** de los partidos del torneo
-universitario TechCup Fútbol. Es uno de ~12 microservicios independientes de la
-plataforma; su único actor es el **árbitro** y su única responsabilidad es la
-ejecución en vivo del partido
+# 2. Descripción del servicio
 
-## Qué SÍ hace este servicio
+Microservicio responsable del **arbitraje en tiempo real** de los partidos del
+torneo universitario TechCup Fútbol. Es uno de ~12 microservicios independientes
+de la plataforma; su único actor es el **árbitro** y su única responsabilidad es
+la ejecución en vivo del partido.
 
-1. Mostrar al árbitro sus partidos asignados y habilitar "gestionar partido" solo
-   cuando el encuentro realmente puede iniciar (alineación confirmada + hora de
-   inicio alcanzada).
+No maneja programación de partidos, horarios ni canchas (Servicio de
+Competencia), alineaciones/nóminas (Servicio de Competencia), ni tabla de
+posiciones o estadísticas acumuladas del torneo (Servicio de Estadísticas). Es
+uno de los tres servicios del dominio **D3 — Operaciones y Comunicación** del
+equipo **astromerge**, junto con `am-logistic-service` y
+`am-notification-service`.
+
+# 3. Funcionalidades del servicio
+
+1. Mostrar al árbitro sus partidos asignados y habilitar "gestionar partido"
+   solo cuando el encuentro realmente puede iniciar (alineación confirmada +
+   hora de inicio alcanzada).
 2. Iniciar el partido y controlar su cronología: pausa, reanudación, paso al
    segundo tiempo y adición de tiempo extra.
-3. Registrar goles (equipo + jugador anotador) actualizando el marcador en vivo.
+3. Registrar goles (equipo + jugador anotador) actualizando el marcador en
+   vivo.
 4. Registrar tarjetas amarillas/rojas por jugador, acumulando sanciones.
 5. Registrar sustituciones (jugador que sale/entra + minuto exacto).
 6. Registrar observaciones de texto libre del árbitro.
 7. Recibir la planilla/acta del partido.
 8. Finalizar el partido, cerrando el registro de eventos.
 
-## Qué NO hace (responsabilidad de otros servicios)
+# 4. Badges
 
-- Programación de partidos, horarios y canchas → **Servicio de Competencia**.
-- Alineaciones/nóminas de equipos → **Servicio de Competencia**.
-- Tabla de posiciones y estadísticas acumuladas del torneo → **Servicio de Estadísticas**.
+[![CI](https://github.com/TECH-CUP-2026-INT/am-matches-service/actions/workflows/ci-push.yml/badge.svg)](https://github.com/TECH-CUP-2026-INT/am-matches-service/actions/workflows/ci-push.yml)
+[![Docs](https://img.shields.io/badge/docs-mkdocs-6a1b9a)](https://tech-cup-2026-int.github.io/am-matches-service/)
 
-## Stack técnico
+# 5. Integrantes del servicio
+
+| Nombre | Contacto |
+|---|---|
+| Tomas Quiceno Ostos | tomas.quiceno-o@mail.escuelaing.edu.co |
+| Sara Viviana Arteaga Rodríguez | sara.arteaga.r91@gmail.com |
+| Julian Tinjaca | julian.tinjaca-c@mail.escuelaing.edu.co |
+| Johan Beltrán | — |
+
+# 6. Introducción rápida para probar
+
+```bash
+# 1. Levantar MongoDB
+docker compose up -d
+
+# 2. Ejecutar el servicio (los índices se crean automáticamente al arrancar)
+./mvnw spring-boot:run
+```
+
+Con el servicio corriendo, explora la API en
+[http://localhost:8080/swagger-ui/index.html](http://localhost:8080/swagger-ui/index.html).
+Como el API Gateway (que valida el JWT) todavía no existe, para probar los
+endpoints protegidos desde Swagger usa el botón **Authorize** con cualquier
+JWT bien formado que incluya los claims `sub` (UUID) y `roles` (debe incluir
+`ARBITRO`) — no hace falta que la firma sea válida, porque este servicio no
+la verifica (esa es responsabilidad del Gateway en producción). Ver
+[Pruebas](#pruebas) más abajo para la suite automatizada.
+
+# 7. Tecnologías usadas
 
 | Capa | Tecnología |
 |---|---|
@@ -39,6 +75,9 @@ ejecución en vivo del partido
 | API | Spring Web (REST) |
 | Seguridad | Spring Security (verificación de rol; el JWT ya viene validado por el API Gateway) |
 | Integraciones externas | REST síncrono vía `RestClient`, detrás de interfaces (puertos) |
+| Documentación | MkDocs (Material) — [`docs/`](docs/) |
+
+---
 
 ## Arquitectura
 
@@ -60,6 +99,11 @@ security/        Lectura de claims del JWT y verificación del rol árbitro
 exception/       Excepciones de dominio + manejador global (@RestControllerAdvice)
 config/          Propiedades tipadas (@ConfigurationProperties) y seguridad
 ```
+
+Diagramas de contexto, componentes y clases (editables en
+[draw.io](https://app.diagrams.net/)) en
+[`docs/assets/diagrams/`](docs/assets/diagrams/); versión Mermaid renderizada
+en [`docs/arquitectura.md`](docs/arquitectura.md).
 
 ### Por qué integraciones síncronas detrás de puertos
 
@@ -183,26 +227,6 @@ Variables de entorno (con valor por defecto entre paréntesis):
 | `AUDITORIA_SERVICE_URL` (`http://localhost:8084`) | Base URL del Servicio de Auditoría |
 | `MATCH_SHEETS_DIR` (`./storage/match-sheets`) | Directorio local donde se guardan las planillas subidas |
 
-## Cómo ejecutar localmente
-
-```bash
-# 1. Levantar MongoDB
-docker compose up -d
-
-# 2. Ejecutar el servicio (los índices se crean automáticamente al arrancar)
-./mvnw spring-boot:run
-```
-
-## Explorar la API (Swagger UI)
-
-Con el servicio corriendo: [http://localhost:8080/swagger-ui/index.html](http://localhost:8080/swagger-ui/index.html)
-
-Como el API Gateway (que valida el JWT) todavía no existe, para probar los endpoints
-protegidos desde Swagger usa el botón **Authorize** con cualquier JWT bien formado
-que incluya los claims `sub` (UUID) y `roles` (debe incluir `ARBITRO`) — no hace
-falta que la firma sea válida, porque este servicio no la verifica (esa es
-responsabilidad del Gateway en producción).
-
 ## Pruebas
 
 ```bash
@@ -217,11 +241,12 @@ responsabilidad del Gateway en producción).
 Las pruebas unitarias cubren la lógica de negocio central: la regla de sanción
 por tarjetas, el marcador en vivo, las transiciones válidas/inválidas del
 cronómetro (iniciar, pausar, reanudar, finalizar), el cálculo del minuto actual,
-y la sanitización de rutas de archivo en la subida de planilla.
+y la sanitización de rutas de archivo en la subida de planilla. El badge de CI
+al inicio de este README refleja el resultado de esta suite en cada push.
 
 ## CI/CD
 
-El pipeline en [`.github/workflows/ci.yml`](.github/workflows/ci-push.yml) se
+El pipeline en [`.github/workflows/ci-push.yml`](.github/workflows/ci-push.yml) se
 dispara en cada `push` a `main`/`develop`/`feature/**` y en cada
 `pull_request` hacia `main`/`develop`, y automatiza:
 
@@ -237,7 +262,9 @@ dispara en cada `push` a `main`/`develop`/`feature/**` y en cada
 
 Requiere los secrets `SONAR_HOST_URL` y `SONAR_TOKEN` configurados en el
 repositorio; la publicación en GHCR usa el `GITHUB_TOKEN` automático de
-Actions.
+Actions. Un segundo workflow,
+[`.github/workflows/deploy-mkdocs.yml`](.github/workflows/deploy-mkdocs.yml),
+publica la documentación en GitHub Pages en cada push a `main`.
 
 ## Documentación completa
 
@@ -249,11 +276,13 @@ publicada en <https://tech-cup-2026-int.github.io/am-matches-service/>.
 Para servirla en local:
 
 ```bash
-pip install mkdocs-material
+pip install -r requirements.txt
 mkdocs serve
 ```
 
 Ver [`docs/arquitectura.md`](docs/arquitectura.md) para los diagramas de
 componentes, clases del dominio, y secuencia de los tres flujos más
 representativos (iniciar partido, registrar tarjeta con sanción, registrar
-gol).
+gol); y [`docs/assets/diagrams/`](docs/assets/diagrams/) para las versiones
+fuente en formato draw.io (`.drawio`, XML editable en
+[app.diagrams.net](https://app.diagrams.net/)).
