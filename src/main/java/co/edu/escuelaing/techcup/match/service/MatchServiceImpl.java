@@ -222,7 +222,8 @@ public class MatchServiceImpl implements MatchService {
         matchFinishedStatPublisher.publishStatsFor(match);
         matchFinishedEventPublisher.publish(new MatchFinishedEvent(
                 match.getCompetenciaMatchId(), match.getTournamentId(), match.getPhase(),
-                outcome.golesA(), outcome.golesB(), outcome.ganadorId(), outcome.eliminadoId(), now));
+                outcome.golesA(), outcome.golesB(), outcome.ganadorId(), outcome.eliminadoId(),
+                outcome.ausenteId(), now));
 
         return MatchMapper.toResponse(match, MatchClock.currentMinute(match), EventType.MATCH_FINISHED);
     }
@@ -241,14 +242,18 @@ public class MatchServiceImpl implements MatchService {
                 throw new ValidationException("Debe indicar el equipo ausente (equipoAusenteId) para declarar walkover");
             }
             matchAccessService.validateTeamBelongsToMatch(match, absentTeamId);
+            match.setAbsentTeamId(absentTeamId);
 
+            UUID presentTeamId = absentTeamId.equals(match.getHomeTeamId())
+                    ? match.getAwayTeamId() : match.getHomeTeamId();
+
+            // Gana el equipo presente en ambas fases; solo cambia el eliminado, porque en
+            // grupos no se elimina a nadie. El marcador queda 0-0: ausenteId es el único dato
+            // que le permite a Tournament separarlo de un empate real (ver MatchFinishedEvent).
             if (match.getPhase() == MatchPhase.ELIMINATORIA) {
-                UUID presentTeamId = absentTeamId.equals(match.getHomeTeamId())
-                        ? match.getAwayTeamId() : match.getHomeTeamId();
-                return new MatchOutcome(0, 0, presentTeamId, absentTeamId);
+                return new MatchOutcome(0, 0, presentTeamId, absentTeamId, absentTeamId);
             }
-            // GRUPOS: walkover se marca FINISHED, pero nadie suma.
-            return new MatchOutcome(0, 0, null, null);
+            return new MatchOutcome(0, 0, presentTeamId, null, absentTeamId);
         }
 
         int golesA = match.getHomeScore();
@@ -256,20 +261,20 @@ public class MatchServiceImpl implements MatchService {
 
         if (match.getPhase() == MatchPhase.GRUPOS) {
             if (golesA > golesB) {
-                return new MatchOutcome(golesA, golesB, match.getHomeTeamId(), null);
+                return new MatchOutcome(golesA, golesB, match.getHomeTeamId(), null, null);
             }
             if (golesB > golesA) {
-                return new MatchOutcome(golesA, golesB, match.getAwayTeamId(), null);
+                return new MatchOutcome(golesA, golesB, match.getAwayTeamId(), null, null);
             }
-            return new MatchOutcome(golesA, golesB, null, null);
+            return new MatchOutcome(golesA, golesB, null, null, null);
         }
 
         // ELIMINATORIA: no se permite empate.
         if (golesA > golesB) {
-            return new MatchOutcome(golesA, golesB, match.getHomeTeamId(), match.getAwayTeamId());
+            return new MatchOutcome(golesA, golesB, match.getHomeTeamId(), match.getAwayTeamId(), null);
         }
         if (golesB > golesA) {
-            return new MatchOutcome(golesA, golesB, match.getAwayTeamId(), match.getHomeTeamId());
+            return new MatchOutcome(golesA, golesB, match.getAwayTeamId(), match.getHomeTeamId(), null);
         }
 
         if (request == null || request.golesPenalesA() == null || request.golesPenalesB() == null) {
@@ -282,10 +287,10 @@ public class MatchServiceImpl implements MatchService {
             throw new InvalidMatchStateException("Los goles de penales no pueden terminar en empate");
         }
         return penalesA > penalesB
-                ? new MatchOutcome(golesA, golesB, match.getHomeTeamId(), match.getAwayTeamId())
-                : new MatchOutcome(golesA, golesB, match.getAwayTeamId(), match.getHomeTeamId());
+                ? new MatchOutcome(golesA, golesB, match.getHomeTeamId(), match.getAwayTeamId(), null)
+                : new MatchOutcome(golesA, golesB, match.getAwayTeamId(), match.getHomeTeamId(), null);
     }
 
-    private record MatchOutcome(int golesA, int golesB, UUID ganadorId, UUID eliminadoId) {
+    private record MatchOutcome(int golesA, int golesB, UUID ganadorId, UUID eliminadoId, UUID ausenteId) {
     }
 }

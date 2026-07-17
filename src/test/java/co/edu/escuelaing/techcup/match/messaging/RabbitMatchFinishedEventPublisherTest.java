@@ -22,7 +22,7 @@ class RabbitMatchFinishedEventPublisherTest {
 
     private MatchFinishedEvent sampleEvent() {
         return new MatchFinishedEvent(UUID.randomUUID(), UUID.randomUUID(), MatchPhase.GRUPOS,
-                2, 1, UUID.randomUUID(), null, Instant.now());
+                2, 1, UUID.randomUUID(), null, null, Instant.now());
     }
 
     @Test
