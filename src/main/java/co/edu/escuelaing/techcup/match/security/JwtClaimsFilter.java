@@ -40,10 +40,19 @@ public class JwtClaimsFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
-        String header = request.getHeader(HttpHeaders.AUTHORIZATION);
-        if (header != null && header.startsWith("Bearer ")) {
+        String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
+        String tokenHeader = request.getHeader("X-Auth-Token");
+        
+        String token = null;
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7);
+        } else if (tokenHeader != null && !tokenHeader.isBlank()) {
+            token = tokenHeader;
+        }
+        
+        if (token != null) {
             try {
-                authenticate(header.substring(7));
+                authenticate(token);
             } catch (Exception ex) {
                 logger.warn("No fue posible interpretar el JWT recibido: " + ex.getMessage());
             }
@@ -71,7 +80,7 @@ public class JwtClaimsFilter extends OncePerRequestFilter {
         AuthenticatedReferee principal = new AuthenticatedReferee(userId, roles);
 
         List<SimpleGrantedAuthority> authorities = roles.stream()
-                .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
+                .map(role -> new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()))
                 .toList();
 
         var authentication = new UsernamePasswordAuthenticationToken(principal, null, authorities);
